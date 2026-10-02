@@ -712,14 +712,41 @@ const BEATS = [
     });
   },
 
-  // 14 reassembles as "Story. Direction. Finish."
+  // 14 "Story. Direction. Finish." reassembles on the left while the Work page,
+  //    the finished campaigns, slides in on the right and scrolls
   (lt) => {
     glow();
+    // the Work page in a card: 800 x 900, 120px from the right edge, centred vertically
+    const card = { x: 1000, y: 90, w: 800, h: 900, r: 16 };
+    const cp = eSite(lt / 0.55);
+    const cx = card.x + (1 - cp) * 160;
+    ctx.save();
+    ctx.globalAlpha = clamp(cp * 1.6);
+    ctx.shadowColor = 'rgba(0,0,0,0.55)';
+    ctx.shadowBlur = 50;
+    ctx.shadowOffsetY = 20;
+    ctx.fillStyle = THEME.bg;
+    roundRect(ctx, cx, card.y, card.w, card.h, card.r);
+    ctx.fill();
+    ctx.shadowColor = 'transparent';
+    const img = IMG.workpage;
+    const sc = card.w / img.naturalWidth;
+    const maxScroll = img.naturalHeight * sc - card.h;
+    const scroll = maxScroll * eInOut((lt - 0.2) / 0.8);
+    ctx.save();
+    roundRect(ctx, cx, card.y, card.w, card.h, card.r);
+    ctx.clip();
+    ctx.drawImage(img, cx, card.y - scroll, card.w, img.naturalHeight * sc);
+    ctx.restore();
+    ctx.restore();
+
+    // the three words, left aligned on the 120px edge, letters flying back in from the scatter
     const rows = [['Story.', SANS_BOLD, THEME.heading], ['Direction.', SANS_BOLD, THEME.heading], ['Finish.', SERIF, THEME.gold]];
-    const size = Math.min(fitSegs(seg('Direction.'), 1200), 220);
+    const size = fitSegs(seg('Direction.'), 780, 200);
     const p = eOut(lt / 0.5);
     rows.forEach(([text, o, c], k) => {
-      chars(ctx, text, W / 2, H / 2 + (k - 1) * size * 1.05, size, o, c, i => {
+      const cxRow = 120 + inkLeft(text, size, o) + segWidth(ctx, text, size, o) / 2;
+      chars(ctx, text, cxRow, H / 2 + (k - 1) * size * 1.08, size, o, c, i => {
         const r = rng(800 + k * 50 + i);
         const a = r() * Math.PI * 2, d = 700 + r() * 900;
         return { dx: Math.cos(a) * d * (1 - p), dy: Math.sin(a) * d * (1 - p), rot: (r() - .5) * 1.4 * (1 - p) };
