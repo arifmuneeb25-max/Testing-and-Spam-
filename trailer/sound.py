@@ -20,7 +20,8 @@ Cue sheet
   14    reverse swell into a small hit at 14.5: the letters reassemble
   15    three panel whooshes
   16-19 escalating impacts, sub drop on "not generated."
-  20    impact, then a two second riser; 21 the cascade whooshes
+  20    impact, then a two second riser; 21 a pass per card as the three rows run,
+        panned with each row, over beds of air that speed up into the cut
   22.0  hard cut to silence (the exhale)
   23    low boom, warm pad begins; 24 soft hit on the cut
   25    deal whoosh, five hover ticks
@@ -183,8 +184,41 @@ t = t_axis(1.4)
 place(np.sin(2 * np.pi * np.cumsum(80 * (30 / 80) ** (t / 1.4)) / SR) * np.exp(-t / 0.7), 19.0, 0.8)
 place(impact(1.1), 20.0, 1.0, verb=0.5)
 place(riser(2.0), 20.0, 0.9, verb=0.2)
-for k in range(8):
-    place(whoosh(0.35, 2200, 500, shape=0.4), 21.0 + k * 0.075, 0.35, 0.8 - 0.2 * k, verb=0.1)
+# 21s reel: three rows run left, right, left and accelerate into the cut.
+# Same layout as REEL / REEL_ROWS in src.html: every card gets a pass whoosh at
+# the moment its centre crosses the middle of the screen, panned the way its
+# row travels; each row also carries a bed of air that speeds up with it.
+REEL_H, REEL_GAP = 300, 30
+REEL_ROWS = [  # (direction, distance, start x, cards: True = 4:5 portrait)
+    (-1, 900, -140, [0, 1, 0, 1, 0, 1, 0]),
+    (1, 1000, -1060, [0, 1, 0, 1, 0, 1, 0]),
+    (-1, 1000, -100, [0, 1, 0, 1, 0, 1, 0]),
+]
+ramp = lambda u: 0.3 * u + 0.7 * u * u
+row_pitch = [(2600, 900), (1900, 650), (1400, 450)]
+for r, (d, dist, x0, cards) in enumerate(REEL_ROWS):
+    # bed of air, louder and brighter as the row speeds up, swept across the field
+    n_seg = 10
+    for k in range(n_seg):
+        u = (k + 0.5) / n_seg
+        speed = 0.3 + 1.4 * u
+        seg = whoosh(1.0 / n_seg + 0.04, 300 * speed + 200 * r, 900 * speed + 300, shape=0.5)
+        place(seg, 21.0 + k / n_seg, 0.12 * speed, d * (-0.6 + 1.2 * u), verb=0.05)
+    # one pass per card, timed to the frame
+    x = x0
+    for portrait in cards:
+        w = REEL_H * 4 / 5 if portrait else REEL_H * 16 / 9
+        c = x + w / 2
+        for i in range(1000):
+            u0, u1 = i / 1000, (i + 1) / 1000
+            a = c + d * dist * ramp(u0) - 960
+            b = c + d * dist * ramp(u1) - 960
+            if a == 0 or (a < 0) != (b < 0):
+                hi, lo = row_pitch[r]
+                ws = whoosh(0.22, hi, lo, shape=0.45)
+                place(ws, 21.0 + u0 - 0.22 * 0.45, 0.32 + 0.2 * u0, d * 0.35, verb=0.1)
+                break
+        x += w + REEL_GAP
 
 # hard cut to silence at 22.0: nothing from the first half rings past it
 cut = int(22.0 * SR)

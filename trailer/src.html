@@ -33,8 +33,8 @@ const THEME = {
   ember:   '#C8A98C',               // ember: closing serif accent ("worth watching.")
   sans:    'Almarai',               // workhorse
   serif:   '"Instrument Serif"',    // italic accent
-  frameInset:  24,                  // hero: p-6
-  frameRadius: 32,                  // hero: rounded-[2rem]
+  frameInset:  0,                   // image shots run full bleed (the site's 24px inset
+  frameRadius: 0,                   // and 32px corners read as a black border in a player)
   cardRadius:  12,                  // cards: 12px
   name: 'MUNEEB ARIF',              // wordmark, tracking 0.28em
   url:  'muneebarifai.com'
@@ -566,7 +566,7 @@ const BEATS = [
   (lt) => {
     heroFrame(clipFrame(1 + lt), { scale: lerp(1.03, 1.0, lt) }, { scrim: 0.55, floor: 0.6 });
     const size = 300;
-    const x = THEME.frameInset + 96 + inkLeft('I direct', size, SANS_BOLD);
+    const x = 120 + inkLeft('I direct', size, SANS_BOLD);
     rich(ctx, seg('I direct'), x, 310, size, Object.assign({ align: 'left' }, slam(lt)));
   },
 
@@ -701,7 +701,7 @@ const BEATS = [
     const l1 = seg('Cinematic brand films.');
     const l2 = [{ t: 'Directed, ', o: SANS, c: THEME.heading }, { t: 'not generated.', o: SERIF, c: THEME.gold }];
     const size = fitSegs(l1, 1180, 130);
-    const x = THEME.frameInset + 72;
+    const x = 96;
     rich(ctx, l1, x, H - 300, size, Object.assign({ align: 'left' }, s));
     rich(ctx, l2, x, H - 300 + size * 1.08, size, Object.assign({ align: 'left' }, s));
   },
