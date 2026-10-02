@@ -95,8 +95,8 @@ function rng(seed) {
 
 const IMG = {};
 
-/* Hero footage frames decode on demand (all 98 at once exceed the browser's
-   decoded-image budget). A small cache keeps neighbouring frames warm. */
+/* Hero footage frames decode on demand (holding every frame decoded at once
+   can exceed the browser's decoded-image budget). A small cache keeps neighbouring frames warm. */
 const CLIP_CACHE = new Map();
 const clipIndex = u => Math.min(CLIP.length - 1, Math.max(0, Math.floor(u * CLIP_FPS)));
 async function ensureClip(i) {
@@ -657,7 +657,7 @@ const BEATS = [
     if (lt > 0.45) frameScrims(0.75, 0.9, eInOut((lt - 0.45) / 0.55));
   },
 
-  // 28-29 the film ends where the website begins: the hero, its scrim, the lockup
+  // 28-29 the end card: portrait, role, name, URL
   (lt) => endCard(lt),
   (lt) => endCard(1 + lt)
 ];
@@ -756,17 +756,76 @@ function closingLine(a, b) {
   if (b > 0) rich(ctx, seg('worth watching.', SERIF, THEME.ember), W / 2, H / 2 - 110 + size * 1.1, size, { alpha: r2.alpha, dy: r2.dy });
 }
 
-/* u = seconds since 28. The hero keeps playing under the site's own hero
-   layout: wordmark as the eyebrow, the line as the headline, the URL below. */
+/* End card layout, after the site's Director section: a 3:4 portrait with
+   16px corners beside the text, a 64px gutter between them. The portrait takes
+   the height of 5 columns of a 1440px, 12 column grid; the portrait and text
+   are centred together as one group, and the frame margins match top and bottom. */
+const ROLE = 'CREATIVE DIRECTOR · AI FILMMAKER';
+const NAME = 'Muneeb Arif';
+const ROLE_O = Object.assign({}, EYEBROW, { track: 0.2 });
+const NAME_O = Object.assign({}, SANS);
+const URL_O = Object.assign({}, SANS, { track: 0.05 });
+const CARD_SIZES = { role: 22, name: 120, url: 32 };
+
+function cardLayout() {
+  const container = 1440, cols = 12, gutter = 64;
+  const col = (container - gutter * (cols - 1)) / cols;
+  const pw = Math.round(col * 5 + gutter * 4), ph = Math.round(pw * 4 / 3);
+  const textW = Math.max(
+    segWidth(ctx, ROLE, CARD_SIZES.role, ROLE_O),
+    segWidth(ctx, NAME, CARD_SIZES.name, NAME_O),
+    segWidth(ctx, THEME.url, CARD_SIZES.url, URL_O));
+  const left = Math.round((W - (pw + gutter + textW)) / 2);
+  return {
+    portrait: { x: left, y: Math.round((H - ph) / 2), w: pw, h: ph, r: 16 },
+    textX: left + pw + gutter
+  };
+}
+
+/* Offset that puts a line's first visible pixel exactly on x (removes side bearing). */
+function inkLeft(text, size, o) {
+  setFont(ctx, size, o);
+  return ctx.measureText(text).actualBoundingBoxLeft;
+}
+
+/* u = seconds since 28. */
 function endCard(u) {
-  heroFrame(clipFrame(2 + u), { scale: 1 + 0.04 * (u / 2) });
-  const x = THEME.frameInset + 72, size = 84;
-  const steps = [0, 0.08, 0.16, 0.3].map(d => rise(u - d, 0.7, 20));
-  const at = (k, f) => f({ align: 'left', alpha: steps[k].alpha, dy: steps[k].dy });
-  at(0, o => rich(ctx, seg(THEME.name, Object.assign({}, SANS, { track: 0.28 }), 'rgba(232,230,222,0.8)'), x, H - 390, 24, o));
-  at(1, o => rich(ctx, seg("Let's make something", SANS, THEME.heading), x, H - 300, size, o));
-  at(2, o => rich(ctx, seg('worth watching.', SERIF, THEME.ember), x, H - 300 + size * 1.08, size, o));
-  at(3, o => rich(ctx, seg(THEME.url, Object.assign({}, EYEBROW, { track: 0.12 }), THEME.muted), x, H - 118, 22, o));
+  glow();
+  const CARD = cardLayout();
+  const p = CARD.portrait;
+  const pr = rise(u, 0.8, 24);
+  ctx.save();
+  ctx.globalAlpha = pr.alpha;
+  ctx.translate(0, pr.dy);
+  ctx.shadowColor = 'rgba(0,0,0,0.35)';
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = '#1C2E4E';
+  roundRect(ctx, p.x, p.y, p.w, p.h, p.r);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  cover(ctx, IMG.portrait, p.x, p.y, p.w, p.h, { radius: p.r, scale: lerp(1.08, 1.0, eOut(u / 2)) });
+  ctx.restore();
+
+  // Text block: role, name, URL, stacked by cap height and centred on the
+  // portrait's vertical centre.
+  const roleO = ROLE_O, nameO = NAME_O, urlO = URL_O;
+  const sizes = CARD_SIZES;
+  const caps = { role: capHeight(ctx, sizes.role, roleO), name: capHeight(ctx, sizes.name, nameO), url: capHeight(ctx, sizes.url, urlO) };
+  const gapA = 40, gapB = 56;
+  const block = caps.role + gapA + caps.name + gapB + caps.url;
+  let top = p.y + p.h / 2 - block / 2;
+  const rows = [
+    ['role', ROLE, roleO, 'rgba(232,230,222,0.7)', 0.15],
+    ['name', NAME, nameO, THEME.heading, 0.23],
+    ['url', THEME.url, urlO, THEME.gold, 0.35]
+  ];
+  rows.forEach(([k, text, o, color, delay], i) => {
+    const r = rise(u - delay, 0.7, 20);
+    const x = CARD.textX + inkLeft(text, sizes[k], o);
+    rich(ctx, seg(text, o, color), x, top + caps[k] / 2, sizes[k], { align: 'left', alpha: r.alpha, dy: r.dy });
+    top += caps[k] + (i === 0 ? gapA : gapB);
+  });
 }
 
 function render(t) {
@@ -786,7 +845,7 @@ function render(t) {
 window.seek = async function (t) {
   await ready;
   const c = clamp(+t || 0, 0, window.DURATION);
-  if (c >= 26) await ensureClip(clipIndex(c - 26));
+  if (c >= 26 && c < 28) await ensureClip(clipIndex(c - 26));
   render(t);
 };
 
