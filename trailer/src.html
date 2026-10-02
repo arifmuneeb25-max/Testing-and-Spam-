@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Muneeb Arif Trailer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0B1120; overflow: hidden; }
+  canvas {
+    position: fixed; inset: 0; margin: auto; display: block;
+    width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh);
+  }
+  #scrub { position: fixed; left: 16px; right: 16px; bottom: 12px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+window.DURATION = 30;
+
+/* =====================================================================
+   STYLE TOKENS, taken from the muneebarifai.com source
+   (tailwind.config.js, src/index.css, Hero.tsx, ClosingCTA.tsx, Nav.tsx)
+   ===================================================================== */
+const THEME = {
+  bg:      '#0B1120',               // ink: page background
+  scrim:   '10,15,28',              // hero scrim rgb, rgba(10,15,28,a)
+  heading: '#F2EDE4',               // --heading: headline text
+  cream:   '#E8E6DE',               // cream: body text
+  muted:   '#8A94A8',               // --muted: eyebrow / labels
+  gold:    '#D9A441',               // --gold: the key word ("premium")
+  goldRgb: '217,164,65',
+  ember:   '#C8A98C',               // ember: closing serif accent ("worth watching.")
+  sans:    'Almarai',               // workhorse
+  serif:   '"Instrument Serif"',    // italic accent
+  frameInset:  24,                  // hero: p-6
+  frameRadius: 32,                  // hero: rounded-[2rem]
+  cardRadius:  12,                  // cards: 12px
+  name: 'MUNEEB ARIF',              // wordmark, tracking 0.28em
+  url:  'muneebarifai.com'
+};
+
+/* Site motion curve: cubic-bezier(0.16, 1, 0.3, 1) */
+const SITE_BEZIER = [0.16, 1, 0.3, 1];
+
+/*__ASSETS__*/
+
+/* ===================================================================== */
+
+const W = 1920, H = 1080;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const off = document.createElement('canvas');
+off.width = W; off.height = H;
+const octx = off.getContext('2d');
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, p) => a + (b - a) * p;
+const eOut = p => 1 - Math.pow(1 - clamp(p), 3);
+const eIn = p => Math.pow(clamp(p), 3);
+const eInOut = p => { p = clamp(p); return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+const eBack = p => { p = clamp(p); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+
+function bezier(x1, y1, x2, y2) {
+  const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+  const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+  const sx = t => ((ax * t + bx) * t + cx) * t;
+  const sy = t => ((ay * t + by) * t + cy) * t;
+  const dx = t => (3 * ax * t + 2 * bx) * t + cx;
+  return p => {
+    p = clamp(p);
+    let t = p;
+    for (let i = 0; i < 8; i++) {
+      const e = sx(t) - p, d = dx(t);
+      if (Math.abs(e) < 1e-6 || Math.abs(d) < 1e-6) break;
+      t = clamp(t - e / d);
+    }
+    return sy(t);
+  };
+}
+const eSite = bezier(...SITE_BEZIER);
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- assets ---------- */
+
+const IMG = {};
+const GRAIN = [];
+
+function makeGrain() {
+  for (let k = 0; k < 6; k++) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const g = c.getContext('2d');
+    const d = g.createImageData(512, 512);
+    const r = rng(9000 + k);
+    for (let p = 0; p < d.data.length; p += 4) {
+      const v = r() * 255;
+      d.data[p] = d.data[p + 1] = d.data[p + 2] = v;
+      d.data[p + 3] = 255;
+    }
+    g.putImageData(d, 0, 0);
+    GRAIN.push(c);
+  }
+}
+
+const ready = (async () => {
+  for (const f of FONTS) {
+    const ff = new FontFace(f.family, `url(${f.src})`, { weight: String(f.weight), style: f.style });
+    await ff.load();
+    document.fonts.add(ff);
+  }
+  await Promise.all(Object.keys(IMAGES).map(async k => {
+    const im = new Image();
+    im.src = IMAGES[k];
+    await im.decode();
+    IMG[k] = im;
+  }));
+  makeGrain();
+  await document.fonts.ready;
+})();
+
+/* ---------- type ---------- */
+
+const SANS_BOLD = { family: THEME.sans, weight: 800, style: 'normal', track: -0.01 };
+const SANS = { family: THEME.sans, weight: 400, style: 'normal', track: -0.01 };
+const EYEBROW = { family: THEME.sans, weight: 400, style: 'normal', track: 0.2 };
+const SERIF = { family: THEME.serif, weight: 400, style: 'italic', track: 0, k: 1.1 };
+
+function setFont(g, size, o) {
+  g.font = `${o.style} ${o.weight} ${size * (o.k || 1)}px ${o.family}`;
+  if ('letterSpacing' in g) g.letterSpacing = (size * (o.k || 1) * (o.track || 0)) + 'px';
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+}
+
+function segWidth(g, text, size, o) {
+  setFont(g, size, o);
+  const tr = ('letterSpacing' in g) ? size * (o.k || 1) * (o.track || 0) : 0;
+  return g.measureText(text).width - tr;
+}
+
+/* A line made of styled segments [{ t, o, c }], sharing one baseline. */
+function measureSegs(g, segs, size) {
+  return segs.reduce((w, s) => w + segWidth(g, s.t, size, s.o), 0);
+}
+
+function fitSegs(segs, targetW, maxSize = 9999) {
+  return Math.min(maxSize, 100 * targetW / measureSegs(ctx, segs, 100));
+}
+
+function capHeight(g, size, o) {
+  setFont(g, size, o);
+  return g.measureText('H').actualBoundingBoxAscent;
+}
+
+function rich(g, segs, x, cy, size, { scale = 1, dx = 0, dy = 0, alpha = 1, align = 'center' } = {}) {
+  const w = measureSegs(g, segs, size);
+  const ch = capHeight(g, size, segs[0].o);
+  g.save();
+  g.translate(x + dx, cy + dy);
+  g.scale(scale, scale);
+  g.globalAlpha *= alpha;
+  let px = align === 'center' ? -w / 2 : 0;
+  for (const s of segs) {
+    setFont(g, size, s.o);
+    g.fillStyle = s.c || THEME.heading;
+    g.fillText(s.t, px, ch / 2);
+    px += segWidth(g, s.t, size, s.o);
+  }
+  g.restore();
+}
+
+const seg = (t, o = SANS_BOLD, c = THEME.heading) => [{ t, o, c }];
+
+/* Letter by letter; fn(i) returns { dx, dy, rot }. */
+function chars(g, text, cx, cy, size, o, color, fn) {
+  g.save();
+  const total = segWidth(g, text, size, o);
+  const ch = capHeight(g, size, o);
+  const x0 = cx - total / 2;
+  g.fillStyle = color;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === ' ') continue;
+    const x = x0 + g.measureText(text.slice(0, i)).width;
+    const cw = g.measureText(c).width;
+    const tr = fn(i);
+    g.save();
+    g.translate(x + cw / 2 + tr.dx, cy + tr.dy);
+    g.rotate(tr.rot || 0);
+    g.fillText(c, -cw / 2, ch / 2);
+    g.restore();
+  }
+  g.restore();
+}
+
+/* Words with extra space between them. */
+function words(g, list, cx, cy, size, gap, { dys = [] } = {}) {
+  const space = segWidth(g, ' ', size, list[0].o);
+  const ws = list.map(w => segWidth(g, w.t, size, w.o));
+  const total = ws.reduce((a, b) => a + b, 0) + (space + gap) * (list.length - 1);
+  const ch = capHeight(g, size, list[0].o);
+  let x = cx - total / 2;
+  g.save();
+  list.forEach((w, i) => {
+    setFont(g, size, w.o);
+    g.fillStyle = w.c || THEME.heading;
+    g.fillText(w.t, x, cy + ch / 2 + (dys[i] || 0));
+    x += ws[i] + space + gap;
+  });
+  g.restore();
+}
+
+/* ---------- image ---------- */
+
+function roundRect(g, x, y, w, h, r) {
+  g.beginPath();
+  g.moveTo(x + r, y);
+  g.arcTo(x + w, y, x + w, y + h, r);
+  g.arcTo(x + w, y + h, x, y + h, r);
+  g.arcTo(x, y + h, x, y, r);
+  g.arcTo(x, y, x + w, y, r);
+  g.closePath();
+}
+
+function cover(g, img, x, y, w, h, { scale = 1, ox = 0, oy = 0, filter = null, alpha = 1, radius = 0 } = {}) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const s = Math.max(w / iw, h / ih) * scale;
+  const dw = iw * s, dh = ih * s;
+  g.save();
+  if (radius) roundRect(g, x, y, w, h, radius); else { g.beginPath(); g.rect(x, y, w, h); }
+  g.clip();
+  if (filter) g.filter = filter;
+  g.globalAlpha *= alpha;
+  g.drawImage(img, x + (w - dw) / 2 + ox, y + (h - dh) / 2 + oy, dw, dh);
+  g.restore();
+}
+
+/* The site's hero treatment: inset rounded frame, left-to-right navy scrim,
+   legibility gradient up from ink. */
+function heroFrame(img, opts, { scrim = 0.75, floor = 0.9 } = {}) {
+  const i = THEME.frameInset, r = THEME.frameRadius;
+  const x = i, y = i, w = W - 2 * i, h = H - 2 * i;
+  cover(ctx, img, x, y, w, h, Object.assign({ radius: r }, opts));
+  ctx.save();
+  roundRect(ctx, x, y, w, h, r);
+  ctx.clip();
+  const lr = ctx.createLinearGradient(x, 0, x + w, 0);
+  lr.addColorStop(0, `rgba(${THEME.scrim},${scrim})`);
+  lr.addColorStop(0.6, `rgba(${THEME.scrim},${scrim * 0.4})`);
+  lr.addColorStop(1, `rgba(${THEME.scrim},0)`);
+  ctx.fillStyle = lr;
+  ctx.fillRect(x, y, w, h);
+  const bt = ctx.createLinearGradient(0, y + h, 0, y);
+  bt.addColorStop(0, `rgba(11,17,32,${floor})`);
+  bt.addColorStop(0.5, `rgba(11,17,32,${floor * 0.3})`);
+  bt.addColorStop(1, 'rgba(11,17,32,0)');
+  ctx.fillStyle = bt;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+/* The site's ambient glow: a whisper of gold anchored top centre. */
+function glow() {
+  const rg = ctx.createRadialGradient(W / 2, H * 0.18, 0, W / 2, H * 0.18, H * 0.9);
+  rg.addColorStop(0, `rgba(${THEME.goldRgb},0.05)`);
+  rg.addColorStop(0.34, `rgba(${THEME.goldRgb},0.02)`);
+  rg.addColorStop(0.72, 'rgba(16,26,48,0)');
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* Evidence: a frame cut out with a torn edge. */
+const tornCache = {};
+function tornPath(seed, w, h) {
+  const key = seed + ':' + w + ':' + h;
+  if (tornCache[key]) return tornCache[key];
+  const r = rng(seed), pts = [], step = 18;
+  const j = () => (r() - .5) * 9 + (r() < .08 ? (r() - .5) * 26 : 0);
+  for (let x = 0; x < w; x += step) pts.push([x, j()]);
+  for (let y = 0; y < h; y += step) pts.push([w + j(), y]);
+  for (let x = w; x > 0; x -= step) pts.push([x, h + j()]);
+  for (let y = h; y > 0; y -= step) pts.push([j(), y]);
+  return (tornCache[key] = pts);
+}
+
+function torn(img, cx, cy, w, h, rot, seed, filter) {
+  const pts = tornPath(seed, w, h);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.closePath();
+  ctx.shadowColor = 'rgba(0,0,0,0.75)';
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = THEME.bg;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.clip();
+  cover(ctx, img, 0, 0, w, h, { filter, scale: 1.04 });
+  ctx.restore();
+}
+
+/* Type filled with a moving frame; outside the letters stays ink. The frame is
+   screened over a warm base so navy areas never sink into the background. */
+function masked(segs, cx, cy, size, img, imgOpts, textOpts = {}) {
+  const paint = c => rich(octx, segs.map(s => Object.assign({}, s, { c })), cx, cy, size, textOpts);
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.globalCompositeOperation = 'source-over';
+  octx.clearRect(0, 0, W, H);
+  paint('#6E6A62');
+  octx.globalCompositeOperation = 'screen';
+  cover(octx, img, 0, 0, W, H, imgOpts);
+  octx.globalCompositeOperation = 'destination-in';
+  paint('#fff');
+  octx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(off, 0, 0);
+}
+
+/* Impact: the type lands from oversize with a short decaying shake. */
+function slam(lt, amp = 0.12, dur = 0.17, shake = 10) {
+  const k = Math.exp(-lt * 13);
+  return {
+    scale: 1 + amp * (1 - eOut(lt / dur)),
+    dx: shake * k * Math.sin(lt * 95),
+    dy: shake * 0.6 * k * Math.cos(lt * 71)
+  };
+}
+
+/* The site's reveal: fade up from a short rise on the site curve. */
+function rise(lt, dur = 0.7, dist = 20) {
+  const p = eSite(lt / dur);
+  return { alpha: p, dy: (1 - p) * dist };
+}
+
+function grain(t) {
+  const f = Math.floor(t * 24);
+  const tile = GRAIN[f % GRAIN.length];
+  const r = rng(f * 131 + 7);
+  const ox = -Math.floor(r() * 512), oy = -Math.floor(r() * 512);
+  ctx.save();
+  ctx.globalAlpha = 0.045;
+  for (let y = oy; y < H; y += 512) for (let x = ox; x < W; x += 512) ctx.drawImage(tile, x, y);
+  ctx.restore();
+}
+
+/* ---------- beats: one function per whole second, lt = 0..1 within it ---------- */
+
+const COLD = seg("I don't generate visuals.");
+
+function coldLine(t, s = { scale: 1, dx: 0, dy: 0 }) {
+  const size = fitSegs(COLD, 1500);
+  const creep = 1 + 0.015 * clamp((t - 1) / 3);
+  rich(ctx, COLD, W / 2, H / 2, size, { scale: s.scale * creep, dx: s.dx, dy: s.dy });
+}
+
+const BEATS = [
+  // 0  total darkness
+  () => {},
+
+  // 1  the line slams in
+  (lt, t) => coldLine(t, slam(lt, 0.12, 0.17, 12)),
+
+  // 2  evidence tears in behind the type: a film still and the homepage
+  (lt, t) => {
+    const a = eOut(lt / 0.22), b = eOut((lt - 0.12) / 0.22);
+    const f = 'grayscale(0.85) contrast(1.1) brightness(0.62)';
+    torn(IMG.film, lerp(-700, 470, a), lerp(-300, 250, a), 900, 506, -0.07, 11, f);
+    torn(IMG.home, lerp(W + 700, 1450, b), lerp(H + 300, 820, b), 960, 540, 0.05, 23, f);
+    coldLine(t);
+  },
+
+  // 3  a strip of work rips across and swallows the line
+  (lt, t) => {
+    const p = eInOut((lt - 0.05) / 0.85);
+    const stripW = 1500;
+    const lead = lerp(-60, W + stripW + 60, p);
+    const trail = lead - stripW;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(lead, 0, W, H); ctx.clip();
+    coldLine(t);
+    ctx.restore();
+    if (lead > 0 && trail < W) {
+      const r = rng(41);
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(trail, 0);
+      for (let y = 0; y <= H; y += 24) ctx.lineTo(lead + (r() - .5) * 28, y);
+      for (let y = H; y >= 0; y -= 24) ctx.lineTo(trail + (r() - .5) * 28, y);
+      ctx.closePath();
+      ctx.clip();
+      cover(ctx, IMG.anat1, 0, 0, W, H, { scale: 1.1, ox: lerp(80, -80, p) });
+      ctx.restore();
+    }
+  },
+
+  // 4  "I direct" over the hero, in the site's own frame
+  (lt) => {
+    heroFrame(IMG.hero, { scale: lerp(1.0, 1.08, lt) }, { scrim: 0.55, floor: 0.6 });
+    const s = seg('I direct');
+    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1400, 380), slam(lt));
+  },
+
+  // 5  "stories." lands in the serif accent
+  (lt) => {
+    glow();
+    const top = seg('I direct');
+    const bot = seg('stories.', SERIF, THEME.gold);
+    const size = Math.min(fitSegs(top, 1250), fitSegs(bot, 1250), 300);
+    rich(ctx, top, W / 2, H / 2 - size * 0.62, size);
+    rich(ctx, bot, W / 2, H / 2 + size * 0.62, size, slam(lt, 0.14));
+  },
+
+  // 6  "that happen to be", set like the site's eyebrow, drifting apart
+  (lt) => {
+    glow();
+    const list = ['THAT', 'HAPPEN', 'TO', 'BE'].map(t => ({ t, o: EYEBROW, c: 'rgba(232,230,222,0.7)' }));
+    words(ctx, list, W / 2, H / 2, 40, lerp(10, 150, eOut(lt)), { dys: [-1, 1, -1, 1].map(d => d * 26 * lt) });
+  },
+
+  // 7  "made with AI." snaps back together
+  (lt) => {
+    glow();
+    const list = [{ t: 'made', o: SANS_BOLD }, { t: 'with', o: SANS_BOLD }, { t: 'AI.', o: SANS_BOLD, c: THEME.gold }];
+    const size = fitSegs([{ t: 'made with AI.', o: SANS_BOLD }], 1400, 240);
+    words(ctx, list, W / 2, H / 2, size, lerp(420, 0, eBack(lt / 0.24)));
+  },
+
+  // 8  B-roll breath, no type
+  (lt) => heroFrame(IMG.stall, { scale: lerp(1.0, 1.14, eOut(lt)), ox: lerp(40, -40, lt) }, { scrim: 0.15, floor: 0.35 }),
+
+  // 9  the brief, as the site's statement reveals it
+  (lt) => {
+    glow();
+    const r = rise(lt, 0.6, 24);
+    rich(ctx, seg('You bring the brief.', SANS, THEME.cream), W / 2, H / 2, 96, { alpha: r.alpha, dy: r.dy });
+  },
+
+  // 10 "I bring"
+  (lt) => {
+    const s = seg('I bring');
+    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1650, 520), slam(lt, 0.14, 0.17, 14));
+  },
+
+  // 11 "the story," with the work inside the letters
+  (lt) => {
+    const s = seg('the story,');
+    masked(s, W / 2, H / 2, fitSegs(s, 1650, 400), IMG.gown,
+      { scale: lerp(1.05, 1.16, lt), oy: lerp(60, -60, lt), filter: 'brightness(1.3) contrast(1.05)' },
+      { scale: 1 + 0.05 * (1 - eOut(lt / 0.2)) });
+  },
+
+  // 12 "the direction," with a hard push
+  (lt) => {
+    const s = seg('the direction,');
+    masked(s, W / 2, H / 2, fitSegs(s, 1700, 400), IMG.anat3,
+      { scale: lerp(1.0, 1.28, eOut(lt)), filter: 'brightness(1.3) contrast(1.05)' },
+      { scale: 1 + 0.05 * (1 - eOut(lt / 0.2)) });
+  },
+
+  // 13 "and the finish." lands, then scatters
+  (lt) => {
+    const text = 'and the finish.';
+    const size = fitSegs(seg(text), 1500, 260);
+    const s = slam(lt, 0.1);
+    const p = eIn((lt - 0.38) / 0.62);
+    chars(ctx, text, W / 2 + s.dx, H / 2 + s.dy, size, SANS_BOLD, THEME.heading, i => {
+      const r = rng(500 + i);
+      const a = r() * Math.PI * 2, d = 600 + r() * 1100;
+      return { dx: Math.cos(a) * d * p, dy: Math.sin(a) * d * p, rot: (r() - .5) * 1.4 * p };
+    });
+  },
+
+  // 14 reassembles as "Story. Direction. Finish."
+  (lt) => {
+    glow();
+    const rows = [['Story.', SANS_BOLD, THEME.heading], ['Direction.', SANS_BOLD, THEME.heading], ['Finish.', SERIF, THEME.gold]];
+    const size = Math.min(fitSegs(seg('Direction.'), 1200), 220);
+    const p = eOut(lt / 0.5);
+    rows.forEach(([text, o, c], k) => {
+      chars(ctx, text, W / 2, H / 2 + (k - 1) * size * 1.05, size, o, c, i => {
+        const r = rng(800 + k * 50 + i);
+        const a = r() * Math.PI * 2, d = 700 + r() * 900;
+        return { dx: Math.cos(a) * d * (1 - p), dy: Math.sin(a) * d * (1 - p), rot: (r() - .5) * 1.4 * (1 - p) };
+      });
+    });
+  },
+
+  // 15 three panels sliding against each other
+  (lt) => {
+    const imgs = [IMG.elf1, IMG.family, IMG.stryde];
+    const i0 = THEME.frameInset, gap = 16;
+    const pw = (W - 2 * i0 - 2 * gap) / 3, ph = H - 2 * i0;
+    imgs.forEach((img, i) => {
+      const dir = i % 2 ? 1 : -1;
+      const enter = eOut((lt - i * 0.07) / 0.28);
+      const y = i0 + dir * (1 - enter) * H;
+      cover(ctx, img, i0 + i * (pw + gap), y, pw, ph, { scale: 1.2, oy: dir * lerp(-90, 90, lt), radius: THEME.cardRadius });
+    });
+  },
+
+  // 16 "Cinematic" with the hero inside the letters
+  (lt) => {
+    const s = seg('Cinematic');
+    masked(s, W / 2, H / 2, fitSegs(s, 1700), IMG.hero,
+      { scale: lerp(1.0, 1.12, lt), filter: 'brightness(1.2) contrast(1.1)' },
+      { scale: 1 + 0.06 * (1 - eOut(lt / 0.18)) });
+  },
+
+  // 17 "brand films." punched in hard
+  (lt) => {
+    const s = seg('brand films.');
+    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1600, 340), slam(lt, 0.16, 0.15, 18));
+  },
+
+  // 18 "Directed,"
+  (lt) => {
+    const s = seg('Directed,');
+    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1450, 340), slam(lt, 0.14));
+  },
+
+  // 19 "not generated." lands heavy in gold serif, the answer to the cold open
+  (lt) => {
+    glow();
+    const s = seg('not generated.', SERIF, THEME.gold);
+    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1640, 360), slam(lt, 0.2, 0.2, 20));
+  },
+
+  // 20 the peak, composed like the site's hero: frame, scrim, headline low left
+  (lt) => {
+    heroFrame(IMG.film, { scale: lerp(1.06, 1.12, lt) }, { scrim: 0.8, floor: 0.95 });
+    const s = slam(lt, 0.06, 0.17, 8);
+    const l1 = seg('Cinematic brand films.');
+    const l2 = [{ t: 'Directed, ', o: SANS, c: THEME.heading }, { t: 'not generated.', o: SERIF, c: THEME.gold }];
+    const size = fitSegs(l1, 1180, 130);
+    const x = THEME.frameInset + 72;
+    rich(ctx, l1, x, H - 300, size, Object.assign({ align: 'left' }, s));
+    rich(ctx, l2, x, H - 300 + size * 1.08, size, Object.assign({ align: 'left' }, s));
+  },
+
+  // 21 every frame cascades through at full speed
+  (lt) => {
+    const list = [IMG.home, IMG.gown, IMG.anat2, IMG.elf7, IMG.thesis, IMG.fomin, IMG.hero, IMG.family];
+    list.forEach((img, i) => {
+      const r = rng(2100 + i);
+      const w = 620 + r() * 380, h = w * 9 / 16;
+      const y = 60 + r() * (H - 120 - h);
+      const p = (lt - i * 0.075 + 0.12) / 0.6;
+      if (p <= 0 || p >= 1) return;
+      const x = lerp(W + 40, -w - 40, p);
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((r() - .5) * 0.07);
+      ctx.shadowColor = 'rgba(0,0,0,0.65)';
+      ctx.shadowBlur = 40;
+      ctx.shadowOffsetY = 18;
+      ctx.fillStyle = THEME.bg;
+      roundRect(ctx, -w / 2, -h / 2, w, h, THEME.cardRadius);
+      ctx.fill();
+      ctx.shadowColor = 'transparent';
+      cover(ctx, img, -w / 2, -h / 2, w, h, { scale: 1.04, radius: THEME.cardRadius });
+      ctx.restore();
+    });
+  },
+
+  // 22-23 the exhale
+  () => {},
+  () => {},
+
+  // 24-29 end card, as the site closes
+  (lt) => endCard(lt, -1, -1),
+  (lt) => endCard(1 + lt, lt, -1),
+  (lt) => endCard(2 + lt, 1 + lt, -1),
+  (lt) => endCard(3 + lt, 2 + lt, -1),
+  (lt) => endCard(4 + lt, 3 + lt, lt),
+  (lt) => endCard(5 + lt, 4 + lt, 1 + lt)
+];
+
+function endCard(a, b, c) {
+  glow();
+  const size = 92;
+  const r1 = rise(a), r2 = rise(b), r3 = rise(c);
+  if (a > 0) rich(ctx, seg("Let's make something", SANS, THEME.cream), W / 2, H / 2 - 110, size, { alpha: r1.alpha, dy: r1.dy });
+  if (b > 0) rich(ctx, seg('worth watching.', SERIF, THEME.ember), W / 2, H / 2 - 110 + size * 1.1, size, { alpha: r2.alpha, dy: r2.dy });
+  if (c > 0) {
+    rich(ctx, seg(THEME.name, Object.assign({}, SANS, { track: 0.28 }), THEME.heading), W / 2, H / 2 + 175, 26, { alpha: r3.alpha, dy: r3.dy });
+    rich(ctx, seg(THEME.url, Object.assign({}, EYEBROW, { track: 0.12 }), THEME.muted), W / 2, H / 2 + 228, 22, { alpha: r3.alpha, dy: r3.dy });
+  }
+}
+
+function render(t) {
+  t = clamp(+t || 0, 0, window.DURATION);
+  const sec = Math.min(29, Math.floor(t));
+  const lt = t - sec;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.filter = 'none';
+  ctx.fillStyle = sec === 0 || sec === 22 || sec === 23 || sec === 24 ? '#000' : THEME.bg;
+  ctx.fillRect(0, 0, W, H);
+  if (sec === 24) {
+    ctx.globalAlpha = eSite(lt / 0.7);
+    ctx.fillStyle = THEME.bg;
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+  }
+  BEATS[sec](lt, t);
+  if ((t >= 1 && t < 22) || t >= 24) grain(t);
+}
+
+window.seek = async function (t) {
+  await ready;
+  render(t);
+};
+
+window.seek(0);
+
+/* Optional scrubber: open with ?preview */
+if (/[?&]preview\b/.test(location.search)) {
+  const s = document.createElement('input');
+  s.type = 'range'; s.id = 'scrub'; s.min = 0; s.max = window.DURATION; s.step = 1 / 30; s.value = 0;
+  s.addEventListener('input', () => window.seek(+s.value));
+  document.body.appendChild(s);
+}
+</script>
+</body>
+</html>
