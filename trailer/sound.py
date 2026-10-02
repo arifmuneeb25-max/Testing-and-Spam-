@@ -8,17 +8,18 @@ guide: swap the synthesised hits and whooshes for library sounds in the edit.
 Run from the repo root: python3 trailer/sound.py   (needs numpy and scipy)
 
 Cue sheet
-  0.0   silence; 0.4 a low swell as the wall of work surfaces
-  1.0   big impact + sub: the cold open line slams in; drone bed starts
-  2.0   two pulls with paper tears, left then right: frames come off the wall
-  3.12  heavy slide to both sides and a low boom: the frame splits on the hero
-  4,5   impacts: "I direct" / "stories."
-  6.3   three hits at 6.30, 6.40, 6.52: "made", "with", "AI." land one by one
-  7.0   whoosh right to left into the crowd; 8.0 softer whoosh into the stall
-  9.0   nothing but the drone: "You bring the brief."
-  10-13 impacts, with a push whoosh at 12 and a scatter whoosh at 13.38
-  14    reverse swell, then three hits at 14.40, 14.58, 14.76 as the words land; a whoosh
-        from the right as the Work page card slides in
+  0.0   big impact + sub: the film opens on the cold open line slamming in;
+        the drone bed starts
+  1.0   two pulls with paper tears, left then right: frames come off the wall
+  2.12  heavy slide to both sides and a low boom: the frame splits on the hero
+  3,4   impacts: "I direct" / "stories."
+  5.3   three hits at 5.30, 5.40, 5.52: "made", "with", "AI." land one by one
+  6.0   whoosh right to left into the crowd; 7.0 softer whoosh into the stall
+  8.0   nothing but the drone: "You bring the brief."
+  9-12  impacts, with a push whoosh at 11 and a scatter whoosh at 12.38
+  13    two seconds on the Video page: a swell and a whoosh from the right as the
+        card slides in, hits at 13.45, 13.70, 13.95 as the words land, then a
+        soft glide of air while the page scrolls through the films
   15    three panel whooshes
   16    letters rise with an upward sweep, soft hit at 16.32
   17    two words fly in from both edges, collide at 17.16
@@ -139,51 +140,51 @@ def pad(d, notes, attack=1.2):
     return sig * env
 
 
-# ---- drone bed, 1.0 to 22.0, building, then cut dead ----
-bed_d = 21.0
+# ---- drone bed, 0.0 to 22.0, building, then cut dead ----
+bed_d = 22.0
 t = t_axis(bed_d)
 bed = (np.sin(2 * np.pi * 55 * t) + 0.6 * np.sin(2 * np.pi * 82.4 * t + 1) + 0.35 * np.sin(2 * np.pi * 110.3 * t + 2))
 bed += 0.25 * filt(rng.standard_normal(len(t)), "lowpass", 160)
-bed *= 10 ** ((-26 + 12 * (t / bed_d) ** 1.5) / 20) * np.minimum(1, t / 0.4)
-place(bed, 1.0, gain=1.0)
+bed *= 10 ** ((-26 + 12 * (t / bed_d) ** 1.5) / 20) * np.minimum(1, t / 0.05)
+place(bed, 0.0, gain=1.0)
 
-# ---- cold open ----
-# the wall surfaces out of the dark: a low swell of air
-place(whoosh(0.6, 120, 700, shape=0.95), 0.4, 0.45, verb=0.3)
-place(impact(1.3), 1.0, 1.0, 0, verb=0.5)
+# ---- cold open: the film starts on the slam ----
+place(impact(1.3), 0.0, 1.0, 0, verb=0.5)
 # two frames pulled off the wall, top left then bottom right, each with a paper tear
-place(whoosh(0.4, 600, 2600, shape=0.7), 2.0, 0.5, -0.6, verb=0.2)
-place(tear(), 2.12, 0.6, -0.6, verb=0.3)
-place(whoosh(0.4, 600, 2600, shape=0.7), 2.1, 0.5, 0.6, verb=0.2)
-place(tear(), 2.22, 0.6, 0.6, verb=0.3)
+place(whoosh(0.4, 600, 2600, shape=0.7), 1.0, 0.5, -0.6, verb=0.2)
+place(tear(), 1.12, 0.6, -0.6, verb=0.3)
+place(whoosh(0.4, 600, 2600, shape=0.7), 1.1, 0.5, 0.6, verb=0.2)
+place(tear(), 1.22, 0.6, 0.6, verb=0.3)
 # the frame splits through the line: a heavy slide opening out to both sides, a low boom
 # two independent noise layers, one per side, so the opening reads wide
-place(whoosh(0.8, 1800, 160, shape=0.25), 3.12, 0.6, -0.5, verb=0.3)
-place(whoosh(0.8, 1800, 160, shape=0.25), 3.12, 0.6, 0.5, verb=0.3)
+place(whoosh(0.8, 1800, 160, shape=0.25), 2.12, 0.6, -0.5, verb=0.3)
+place(whoosh(0.8, 1800, 160, shape=0.25), 2.12, 0.6, 0.5, verb=0.3)
 t = t_axis(1.6)
-place(np.sin(2 * np.pi * np.cumsum(70 * (36 / 70) ** (t / 1.6)) / SR) * np.exp(-t / 0.6), 3.12, 0.8, verb=0.3)
+place(np.sin(2 * np.pi * np.cumsum(70 * (36 / 70) ** (t / 1.6)) / SR) * np.exp(-t / 0.6), 2.12, 0.8, verb=0.3)
 
 # ---- kinetic showcase ----
-place(impact(0.9), 4.0, 0.9, verb=0.4)
-place(impact(1.0), 5.0, 0.9, verb=0.5)
-# 6: the banner pulls back under a soft swell; "made", "with", "AI." land one after another
-place(whoosh(0.5, 900, 250, shape=0.2), 6.0, 0.35, verb=0.3)
-place(impact(0.45), 6.30, 0.65, -0.3, verb=0.3)
-place(impact(0.45), 6.40, 0.65, 0.0, verb=0.3)
-place(impact(0.8), 6.52, 0.9, 0.3, verb=0.4)
-place(whoosh(0.7, 2500, 400, shape=0.3), 7.0, 0.55, 0.6, verb=0.2)
-place(whoosh(0.6, 1800, 300, shape=0.3), 8.0, 0.4, -0.5, verb=0.2)
-place(impact(1.0), 10.0, 0.95, verb=0.5)
-place(impact(0.7), 11.0, 0.8, verb=0.5)
-place(impact(0.7), 12.0, 0.8, verb=0.4)
-place(whoosh(0.8, 300, 1200, shape=0.4), 12.0, 0.4)
-place(impact(0.8), 13.0, 0.85, verb=0.4)
-place(whoosh(0.62, 600, 5000, shape=0.6), 13.38, 0.6, -0.4, verb=0.3)
-place(whoosh(0.4, 5000, 600, shape=0.95), 14.0, 0.45, 0.4)
-# 14: the three words land one after another, the Work page scrolls a step with each
-for k, at in enumerate((14.40, 14.58, 14.76)):
+place(impact(0.9), 3.0, 0.9, verb=0.4)
+place(impact(1.0), 4.0, 0.9, verb=0.5)
+# 5: the banner pulls back under a soft swell; "made", "with", "AI." land one after another
+place(whoosh(0.5, 900, 250, shape=0.2), 5.0, 0.35, verb=0.3)
+place(impact(0.45), 5.30, 0.65, -0.3, verb=0.3)
+place(impact(0.45), 5.40, 0.65, 0.0, verb=0.3)
+place(impact(0.8), 5.52, 0.9, 0.3, verb=0.4)
+place(whoosh(0.7, 2500, 400, shape=0.3), 6.0, 0.55, 0.6, verb=0.2)
+place(whoosh(0.6, 1800, 300, shape=0.3), 7.0, 0.4, -0.5, verb=0.2)
+place(impact(1.0), 9.0, 0.95, verb=0.5)
+place(impact(0.7), 10.0, 0.8, verb=0.5)
+place(impact(0.7), 11.0, 0.8, verb=0.4)
+place(whoosh(0.8, 300, 1200, shape=0.4), 11.0, 0.4)
+place(impact(0.8), 12.0, 0.85, verb=0.4)
+place(whoosh(0.62, 600, 5000, shape=0.6), 12.38, 0.6, -0.4, verb=0.3)
+# 13-15: two seconds on the Video page. The words land one after another with a
+# hit each while the card slides in, then the page glides through the films.
+place(whoosh(0.45, 5000, 600, shape=0.95), 13.0, 0.45, 0.4)
+place(whoosh(0.6, 350, 1600, shape=0.45), 13.0, 0.35, 0.6, verb=0.2)
+for k, at in enumerate((13.45, 13.70, 13.95)):
     place(impact(0.35 + 0.1 * k), at, 0.6 + 0.08 * k, -0.3, verb=0.35)
-place(whoosh(0.55, 350, 1600, shape=0.45), 14.0, 0.35, 0.6, verb=0.2)  # the Work page card slides in from the right
+place(whoosh(0.95, 220, 900, shape=0.5), 14.05, 0.22, 0.4, verb=0.2)
 for k in range(3):
     place(whoosh(0.4, 1500, 500, shape=0.35), 15.0 + k * 0.07, 0.4, -0.7 + 0.7 * k, verb=0.2)
 # 16: "Cinematic" letters rise in sequence: an upward sweep, a soft hit as they settle
