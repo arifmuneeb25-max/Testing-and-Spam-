@@ -297,9 +297,12 @@ function chars(g, text, cx, cy, size, o, color, fn) {
     const x = x0 + g.measureText(text.slice(0, i)).width;
     const cw = g.measureText(c).width;
     const tr = fn(i);
+    if (tr.alpha === 0) continue;
     g.save();
     g.translate(x + cw / 2 + tr.dx, cy + tr.dy);
     g.rotate(tr.rot || 0);
+    g.scale(tr.sx == null ? 1 : tr.sx, tr.sy == null ? 1 : tr.sy);
+    if (tr.alpha != null) g.globalAlpha *= tr.alpha;
     g.fillText(c, -cw / 2, ch / 2);
     g.restore();
   }
@@ -434,6 +437,38 @@ function masked(segs, cx, cy, size, img, imgOpts, textOpts = {}) {
   cover(octx, img, 0, 0, W, H, imgOpts);
   octx.globalCompositeOperation = 'destination-in';
   paint('#fff');
+  octx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(off, 0, 0);
+}
+
+/* Like masked(), but the caller paints the letterforms (for per-letter motion).
+   The letters are painted into their own mask canvas first and applied in a
+   single destination-in pass (painted letter by letter in that mode, each
+   letter would erase the ones before it). `band` ({ y, h }) optionally limits
+   the mask to a horizontal band, so letters can rise from below a baseline. */
+const mcv = document.createElement('canvas');
+mcv.width = W; mcv.height = H;
+const mctx = mcv.getContext('2d');
+
+function maskedPaint(paint, img, imgOpts, band) {
+  mctx.setTransform(1, 0, 0, 1, 0, 0);
+  mctx.globalCompositeOperation = 'source-over';
+  mctx.clearRect(0, 0, W, H);
+  paint(mctx, '#fff');
+  if (band) {
+    mctx.globalCompositeOperation = 'destination-in';
+    mctx.fillStyle = '#fff';
+    mctx.fillRect(0, band.y, W, band.h);
+    mctx.globalCompositeOperation = 'source-over';
+  }
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.globalCompositeOperation = 'source-over';
+  octx.clearRect(0, 0, W, H);
+  paint(octx, '#6E6A62');
+  octx.globalCompositeOperation = 'screen';
+  cover(octx, img, 0, 0, W, H, imgOpts);
+  octx.globalCompositeOperation = 'destination-in';
+  octx.drawImage(mcv, 0, 0);
   octx.globalCompositeOperation = 'source-over';
   ctx.drawImage(off, 0, 0);
 }
@@ -752,24 +787,57 @@ const BEATS = [
     });
   },
 
-  // 16 "Cinematic" with the hero inside the letters
+  // 16 "Cinematic": letters rise one by one out of a hidden baseline, the hero film inside them
   (lt) => {
-    const s = seg('Cinematic');
-    masked(s, W / 2, H / 2, fitSegs(s, 1700), IMG.hero,
-      { scale: lerp(1.0, 1.12, lt), filter: 'brightness(1.2) contrast(1.1)' },
-      { scale: 1 + 0.06 * (1 - eOut(lt / 0.18)) });
+    const text = 'Cinematic';
+    const size = fitSegs(seg(text), 1700);
+    const ch = capHeight(ctx, size, SANS_BOLD);
+    const paint = (g, c) => chars(g, text, W / 2, H / 2, size, SANS_BOLD, c, i => {
+      const p = eSite((lt - i * 0.035) / 0.42);
+      return { dx: 0, dy: (1 - p) * size * 1.05 };
+    });
+    maskedPaint(paint, IMG.hero, { scale: lerp(1.0, 1.12, lt), filter: 'brightness(1.2) contrast(1.1)' },
+      { y: H / 2 - size, h: size + ch / 2 + size * 0.28 });
   },
 
-  // 17 "brand films." punched in hard
+  // 17 "brand films.": the words fly in from opposite edges and collide in the centre
   (lt) => {
-    const s = seg('brand films.');
-    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1600, 340), slam(lt, 0.16, 0.15, 18));
+    glow();
+    const size = fitSegs(seg('brand films.'), 1600, 340);
+    const wB = segWidth(ctx, 'brand', size, SANS_BOLD), wS = segWidth(ctx, ' ', size, SANS_BOLD);
+    const x0 = W / 2 - segWidth(ctx, 'brand films.', size, SANS_BOLD) / 2, xF = x0 + wB + wS;
+    const hit = 0.16;
+    const s = lt >= hit ? slam(lt - hit, 0.07, 0.12, 22) : { scale: 1, dx: 0, dy: 0 };
+    const draw = (tt, alpha) => {
+      const p = Math.pow(clamp(tt / hit), 2);
+      rich(ctx, seg('brand'), x0 - (1 - p) * (x0 + wB + 120), H / 2, size, { align: 'left', alpha });
+      rich(ctx, seg('films.'), xF + (1 - p) * (W - xF + 120), H / 2, size, { align: 'left', alpha });
+    };
+    ctx.save();
+    ctx.translate(W / 2 + s.dx, H / 2 + s.dy);
+    ctx.scale(s.scale, s.scale);
+    ctx.translate(-W / 2, -H / 2);
+    if (lt < hit) [3, 2, 1].forEach(k => draw(lt - k * 0.018, 0.22 / k));
+    draw(lt, 1);
+    ctx.restore();
   },
 
-  // 18 "Directed,"
+  // 18 "Directed,": letters flip down into place left to right, the word punches as the last lands
   (lt) => {
-    const s = seg('Directed,');
-    rich(ctx, s, W / 2, H / 2, fitSegs(s, 1450, 340), slam(lt, 0.14));
+    glow();
+    const text = 'Directed,';
+    const size = fitSegs(seg(text), 1450, 340);
+    const land = 0.03 * (text.length - 1) + 0.28;
+    const s = lt >= land ? slam(lt - land, 0.05, 0.12, 12) : { scale: 1, dx: 0, dy: 0 };
+    ctx.save();
+    ctx.translate(W / 2 + s.dx, H / 2 + s.dy);
+    ctx.scale(s.scale, s.scale);
+    ctx.translate(-W / 2, -H / 2);
+    chars(ctx, text, W / 2, H / 2, size, SANS_BOLD, THEME.heading, i => {
+      const p = clamp((lt - i * 0.03) / 0.28);
+      return { dx: 0, dy: -(1 - eOut(p)) * size * 0.35, sy: eBack(p), alpha: p > 0 ? 1 : 0 };
+    });
+    ctx.restore();
   },
 
   // 19 "not generated." lands heavy in gold serif, the answer to the cold open

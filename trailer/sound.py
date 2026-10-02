@@ -19,7 +19,10 @@ Cue sheet
   10-13 impacts, with a push whoosh at 12 and a scatter whoosh at 13.38
   14    reverse swell into a small hit at 14.5: the letters reassemble
   15    three panel whooshes
-  16-19 escalating impacts, sub drop on "not generated."
+  16    letters rise with an upward sweep, soft hit at 16.32
+  17    two words fly in from both edges, collide at 17.16
+  18    a tick per letter as "Directed," flips in, punch at 18.52
+  19    the heaviest impact and a sub drop on "not generated."
   20    impact, then a two second riser; 21 a pass per card as the three rows run,
         panned with each row, over beds of air that speed up into the cut
   22.0  hard cut to silence (the exhale)
@@ -176,9 +179,17 @@ place(whoosh(0.5, 5000, 600, shape=0.95), 14.0, 0.5, 0.4)
 place(impact(0.45), 14.5, 0.7, verb=0.4)
 for k in range(3):
     place(whoosh(0.4, 1500, 500, shape=0.35), 15.0 + k * 0.07, 0.4, -0.7 + 0.7 * k, verb=0.2)
-place(impact(0.8), 16.0, 0.85, verb=0.4)
-place(impact(1.0), 17.0, 0.95, verb=0.4)
-place(impact(1.1), 18.0, 1.0, verb=0.4)
+# 16: "Cinematic" letters rise in sequence: an upward sweep, a soft hit as they settle
+place(whoosh(0.45, 300, 2200, shape=0.8), 16.0, 0.45, verb=0.3)
+place(impact(0.55), 16.32, 0.75, verb=0.4)
+# 17: "brand" and "films." fly in from both edges and collide at 17.16
+place(whoosh(0.16, 500, 2400, shape=0.97), 17.0, 0.55, -0.8)
+place(whoosh(0.16, 500, 2400, shape=0.97), 17.0, 0.55, 0.8)
+place(impact(1.05), 17.16, 1.0, verb=0.45)
+# 18: "Directed," flips in letter by letter, then punches as the last letter lands
+for i in range(9):
+    place(tick(), 18.14 + i * 0.03, 0.45, -0.7 + 1.4 * i / 8, verb=0.2)
+place(impact(1.1), 18.52, 1.0, verb=0.4)
 place(impact(1.5), 19.0, 1.1, verb=0.6)
 t = t_axis(1.4)
 place(np.sin(2 * np.pi * np.cumsum(80 * (30 / 80) ** (t / 1.4)) / SR) * np.exp(-t / 0.7), 19.0, 0.8)
