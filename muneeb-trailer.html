@@ -1,0 +1,563 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Muneeb Arif Trailer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  canvas {
+    position: fixed; inset: 0; margin: auto; display: block;
+    width: min(100vw, 177.7778vh); height: min(56.25vw, 100vh);
+  }
+  #scrub { position: fixed; left: 16px; right: 16px; bottom: 12px; z-index: 2; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+window.DURATION = 30;
+
+/* =====================================================================
+   STYLE TOKENS
+   PLACEHOLDER VALUES. muneebarifai.com was unreachable from the build
+   environment, so nothing below is extracted from the site yet.
+   Replace every value marked [SITE] with the real one from the site's CSS.
+   ===================================================================== */
+const THEME = {
+  bg:            '#000000',                                   // [SITE] page background
+  ink:           '#F2F2F2',                                   // [SITE] primary text color
+  muted:         'rgba(242,242,242,0.5)',                     // [SITE] secondary text color
+  accent:        '#F2F2F2',                                   // [SITE] accent color (used on "AI.")
+  display:       '"Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif', // [SITE] headline font
+  displayWeight: 800,                                         // [SITE]
+  displayTrack:  -0.035,                                      // [SITE] letter spacing, in em
+  displayUpper:  false,                                       // [SITE] true if headlines are uppercase
+  body:          '"Helvetica Neue", Helvetica, Arial, "Liberation Sans", sans-serif', // [SITE] body / editorial font
+  bodyWeight:    400,                                         // [SITE]
+  bodyTrack:     0,                                           // [SITE]
+  nameTrack:     0.22,                                        // [SITE] spacing on the name lockup
+  name:          'Muneeb Arif',
+  url:           'muneebarifai.com'
+};
+
+/* Embedded fonts: { family, weight, style, src: 'data:font/woff2;base64,...' } */
+const FONTS = [];
+
+/* Site imagery as base64 data URIs. Empty string renders a labelled placeholder. */
+const IMAGES = {
+  hero:  '',   // [SITE] homepage hero section
+  home:  '',   // [SITE] homepage screenshot
+  work1: '',   // [SITE] portfolio frame
+  work2: '',   // [SITE] portfolio frame
+  work3: '',   // [SITE] portfolio frame (B-roll at 8s)
+  work4: '',   // [SITE] portfolio frame
+  work5: ''    // [SITE] strongest portfolio frame (peak at 20s)
+};
+
+/* ===================================================================== */
+
+const W = 1920, H = 1080;
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+const off = document.createElement('canvas');
+off.width = W; off.height = H;
+const octx = off.getContext('2d');
+
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, p) => a + (b - a) * p;
+const eOut = p => 1 - Math.pow(1 - clamp(p), 3);
+const eIn = p => Math.pow(clamp(p), 3);
+const eInOut = p => { p = clamp(p); return p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2; };
+const eBack = p => { p = clamp(p); const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(p - 1, 3) + c1 * Math.pow(p - 1, 2); };
+
+function rng(seed) {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------- assets ---------- */
+
+const IMG = {};
+const GRAIN = [];
+
+function placeholder(key, i) {
+  const c = document.createElement('canvas');
+  c.width = 1600; c.height = 900;
+  const g = c.getContext('2d');
+  const r = rng(1000 + i * 77);
+  const lg = g.createLinearGradient(0, 0, 1600, 900 * r());
+  lg.addColorStop(0, '#0b0b0b');
+  lg.addColorStop(1, '#2e2e2e');
+  g.fillStyle = lg;
+  g.fillRect(0, 0, 1600, 900);
+  for (let k = 0; k < 3; k++) {
+    const x = r() * 1600, y = r() * 600, rad = 220 + r() * 520;
+    const rg = g.createRadialGradient(x, y, 0, x, y, rad);
+    rg.addColorStop(0, `rgba(215,215,215,${0.3 + r() * 0.35})`);
+    rg.addColorStop(1, 'rgba(215,215,215,0)');
+    g.fillStyle = rg;
+    g.fillRect(0, 0, 1600, 900);
+  }
+  g.fillStyle = 'rgba(0,0,0,0.55)';
+  g.fillRect(0, 900 * (0.64 + r() * 0.1), 1600, 900);
+  g.font = '500 26px "DejaVu Sans Mono", Menlo, monospace';
+  g.fillStyle = 'rgba(255,255,255,0.45)';
+  g.fillText('PLACEHOLDER  ' + key.toUpperCase(), 48, 852);
+  return c;
+}
+
+function makeGrain() {
+  for (let k = 0; k < 6; k++) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 512;
+    const g = c.getContext('2d');
+    const d = g.createImageData(512, 512);
+    const r = rng(9000 + k);
+    for (let p = 0; p < d.data.length; p += 4) {
+      const v = r() * 255;
+      d.data[p] = d.data[p + 1] = d.data[p + 2] = v;
+      d.data[p + 3] = 255;
+    }
+    g.putImageData(d, 0, 0);
+    GRAIN.push(c);
+  }
+}
+
+const ready = (async () => {
+  for (const f of FONTS) {
+    try {
+      const ff = new FontFace(f.family, `url(${f.src})`, { weight: String(f.weight || 400), style: f.style || 'normal' });
+      await ff.load();
+      document.fonts.add(ff);
+    } catch (e) {}
+  }
+  await Promise.all(Object.keys(IMAGES).map(async (k, i) => {
+    if (IMAGES[k]) {
+      const im = new Image();
+      im.src = IMAGES[k];
+      try { await im.decode(); IMG[k] = im; return; } catch (e) {}
+    }
+    IMG[k] = placeholder(k, i);
+  }));
+  makeGrain();
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+})();
+
+/* ---------- drawing helpers ---------- */
+
+const DISPLAY = () => ({ family: THEME.display, weight: THEME.displayWeight, track: THEME.displayTrack });
+const BODY = () => ({ family: THEME.body, weight: THEME.bodyWeight, track: THEME.bodyTrack });
+const D = s => THEME.displayUpper ? s.toUpperCase() : s;
+
+function setFont(g, size, o) {
+  g.font = `${o.weight} ${size}px ${o.family}`;
+  if ('letterSpacing' in g) g.letterSpacing = (size * (o.track || 0)) + 'px';
+  g.textAlign = 'left';
+  g.textBaseline = 'alphabetic';
+}
+
+function textWidth(g, text, size, o) {
+  return g.measureText(text).width - (('letterSpacing' in g) ? size * (o.track || 0) : 0);
+}
+
+function fit(text, targetW, o, maxSize = 9999) {
+  setFont(ctx, 100, o);
+  return Math.min(maxSize, 100 * targetW / textWidth(ctx, text, 100, o));
+}
+
+function line(g, text, cx, cy, size, o, { color = THEME.ink, scale = 1, dx = 0, dy = 0, alpha = 1, align = 'center' } = {}) {
+  g.save();
+  setFont(g, size, o);
+  const w = textWidth(g, text, size, o);
+  const ch = g.measureText('H').actualBoundingBoxAscent;
+  g.translate(cx + dx, cy + dy);
+  g.scale(scale, scale);
+  g.globalAlpha *= alpha;
+  g.fillStyle = color;
+  g.fillText(text, align === 'center' ? -w / 2 : 0, ch / 2);
+  g.restore();
+}
+
+/* Draws a line letter by letter; fn(i, char) returns { dx, dy, rot, alpha }. */
+function chars(g, text, cx, cy, size, o, fn, color = THEME.ink) {
+  g.save();
+  setFont(g, size, o);
+  const total = textWidth(g, text, size, o);
+  const ch = g.measureText('H').actualBoundingBoxAscent;
+  const x0 = cx - total / 2;
+  g.fillStyle = color;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (c === ' ') continue;
+    const x = x0 + g.measureText(text.slice(0, i)).width;
+    const cw = g.measureText(c).width;
+    const tr = fn(i, c);
+    g.save();
+    g.translate(x + cw / 2 + (tr.dx || 0), cy + (tr.dy || 0));
+    g.rotate(tr.rot || 0);
+    g.globalAlpha = tr.alpha == null ? 1 : tr.alpha;
+    g.fillText(c, -cw / 2, ch / 2);
+    g.restore();
+  }
+  g.restore();
+}
+
+/* Words with extra spacing between them; colors[i] optional per word. */
+function words(g, list, cx, cy, size, o, gap, { colors = [], dys = [], alpha = 1 } = {}) {
+  g.save();
+  setFont(g, size, o);
+  const space = g.measureText(' ').width;
+  const ws = list.map(w => textWidth(g, w, size, o));
+  const total = ws.reduce((a, b) => a + b, 0) + (space + gap) * (list.length - 1);
+  const ch = g.measureText('H').actualBoundingBoxAscent;
+  let x = cx - total / 2;
+  g.globalAlpha = alpha;
+  list.forEach((w, i) => {
+    g.fillStyle = colors[i] || THEME.ink;
+    g.fillText(w, x, cy + ch / 2 + (dys[i] || 0));
+    x += ws[i] + space + gap;
+  });
+  g.restore();
+}
+
+function cover(g, img, x, y, w, h, { scale = 1, ox = 0, oy = 0, filter = null, alpha = 1 } = {}) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const s = Math.max(w / iw, h / ih) * scale;
+  const dw = iw * s, dh = ih * s;
+  g.save();
+  g.beginPath(); g.rect(x, y, w, h); g.clip();
+  if (filter) g.filter = filter;
+  g.globalAlpha *= alpha;
+  g.drawImage(img, x + (w - dw) / 2 + ox, y + (h - dh) / 2 + oy, dw, dh);
+  g.restore();
+}
+
+function vignette(strength = 0.55) {
+  const rg = ctx.createRadialGradient(W / 2, H / 2, H * 0.35, W / 2, H / 2, H * 1.05);
+  rg.addColorStop(0, 'rgba(0,0,0,0)');
+  rg.addColorStop(1, `rgba(0,0,0,${strength})`);
+  ctx.fillStyle = rg;
+  ctx.fillRect(0, 0, W, H);
+}
+
+/* Image cut out of the frame with a torn edge, like evidence pinned to a board. */
+const tornCache = {};
+function tornPath(seed, w, h) {
+  const key = seed + ':' + w + ':' + h;
+  if (tornCache[key]) return tornCache[key];
+  const r = rng(seed), pts = [], step = 18;
+  const j = () => (r() - .5) * 9 + (r() < .08 ? (r() - .5) * 26 : 0);
+  for (let x = 0; x < w; x += step) pts.push([x, j()]);
+  for (let y = 0; y < h; y += step) pts.push([w + j(), y]);
+  for (let x = w; x > 0; x -= step) pts.push([x, h + j()]);
+  for (let y = h; y > 0; y -= step) pts.push([j(), y]);
+  return (tornCache[key] = pts);
+}
+
+function torn(img, cx, cy, w, h, rot, seed, { filter = null, alpha = 1, scale = 1.04 } = {}) {
+  const pts = tornPath(seed, w, h);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(rot);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.globalAlpha = alpha;
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+  ctx.closePath();
+  ctx.shadowColor = 'rgba(0,0,0,0.75)';
+  ctx.shadowBlur = 50;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = '#000';
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.clip();
+  cover(ctx, img, 0, 0, w, h, { filter, scale });
+  ctx.restore();
+}
+
+/* Text filled with a moving image; everything outside the letters stays black. */
+function masked(text, cx, cy, size, o, img, imgOpts, textOpts = {}) {
+  octx.setTransform(1, 0, 0, 1, 0, 0);
+  octx.globalCompositeOperation = 'source-over';
+  octx.clearRect(0, 0, W, H);
+  line(octx, text, cx, cy, size, o, Object.assign({ color: '#fff' }, textOpts));
+  octx.globalCompositeOperation = 'source-in';
+  cover(octx, img, 0, 0, W, H, imgOpts);
+  octx.globalCompositeOperation = 'source-over';
+  ctx.drawImage(off, 0, 0);
+}
+
+/* Impact: the type lands from oversize with a short decaying shake. */
+function slam(lt, amp = 0.12, dur = 0.17, shake = 10) {
+  const k = Math.exp(-lt * 13);
+  return {
+    scale: 1 + amp * (1 - eOut(lt / dur)),
+    dx: shake * k * Math.sin(lt * 95),
+    dy: shake * 0.6 * k * Math.cos(lt * 71)
+  };
+}
+
+function grain(t) {
+  const f = Math.floor(t * 24);
+  const tile = GRAIN[f % GRAIN.length];
+  const r = rng(f * 131 + 7);
+  const ox = -Math.floor(r() * 512), oy = -Math.floor(r() * 512);
+  ctx.save();
+  ctx.globalAlpha = 0.045;
+  for (let y = oy; y < H; y += 512) for (let x = ox; x < W; x += 512) ctx.drawImage(tile, x, y);
+  ctx.restore();
+}
+
+/* ---------- copy ---------- */
+
+const COLD = "I don't generate visuals.";
+const END1 = "Let's make something";
+const END2 = 'worth watching.';
+
+/* ---------- beats: one function per whole second, lt = 0..1 within it ---------- */
+
+function coldLine(t, s = { scale: 1, dx: 0, dy: 0 }) {
+  const size = fit(D(COLD), 1150, DISPLAY());
+  const creep = 1 + 0.015 * clamp((t - 1) / 3);
+  line(ctx, D(COLD), W / 2, H / 2, size, DISPLAY(), { scale: s.scale * creep, dx: s.dx, dy: s.dy });
+}
+
+function tornEvidence(lt) {
+  const a = eOut(lt / 0.22), b = eOut((lt - 0.12) / 0.22);
+  const f = 'grayscale(1) contrast(1.15) brightness(0.62)';
+  torn(IMG.work1, lerp(-700, 470, a), lerp(-300, 250, a), 900, 560, -0.07, 11, { filter: f });
+  torn(IMG.home, lerp(W + 700, 1450, b), lerp(H + 300, 820, b), 940, 580, 0.05, 23, { filter: f });
+}
+
+const BEATS = [
+  // 0  total darkness
+  () => {},
+
+  // 1  the line slams in
+  (lt, t) => coldLine(t, slam(lt, 0.12, 0.17, 12)),
+
+  // 2  evidence tears in behind the type
+  (lt, t) => { tornEvidence(lt); coldLine(t); },
+
+  // 3  a strip of project frame rips across and swallows the line
+  (lt, t) => {
+    const p = eInOut((lt - 0.05) / 0.85);
+    const stripW = 1500;
+    const lead = lerp(-60, W + stripW + 60, p);
+    const trail = lead - stripW;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(lead, 0, W, H); ctx.clip();
+    coldLine(t);
+    ctx.restore();
+    if (lead > 0 && trail < W) {
+      ctx.save();
+      ctx.beginPath();
+      const r = rng(41);
+      ctx.moveTo(trail, 0);
+      for (let y = 0; y <= H; y += 24) ctx.lineTo(lead + (r() - .5) * 28, y);
+      for (let y = H; y >= 0; y -= 24) ctx.lineTo(trail + (r() - .5) * 28, y);
+      ctx.closePath();
+      ctx.clip();
+      cover(ctx, IMG.work2, 0, 0, W, H, { scale: 1.1, ox: lerp(80, -80, p), filter: 'grayscale(0.35) brightness(0.85)' });
+      ctx.restore();
+    }
+  },
+
+  // 4  "I direct" over the hero
+  (lt) => {
+    cover(ctx, IMG.hero, 0, 0, W, H, { scale: lerp(1.0, 1.08, lt), filter: 'brightness(0.5)' });
+    vignette();
+    line(ctx, D('I direct'), W / 2, H / 2, fit(D('I direct'), 1450, DISPLAY(), 360), DISPLAY(), slam(lt));
+  },
+
+  // 5  "stories." stacks under it, type alone
+  (lt) => {
+    const s = Math.min(fit(D('I direct'), 1350, DISPLAY()), fit(D('stories.'), 1350, DISPLAY()), 300);
+    line(ctx, D('I direct'), W / 2, H / 2 - s * 0.6, s, DISPLAY());
+    line(ctx, D('stories.'), W / 2, H / 2 + s * 0.6, s, DISPLAY(), slam(lt, 0.14));
+  },
+
+  // 6  "that happen to be" drifts apart
+  (lt) => {
+    const o = Object.assign(BODY(), { track: 0.3 });
+    words(ctx, ['that', 'happen', 'to', 'be'], W / 2, H / 2, 54, o, lerp(10, 150, eOut(lt)),
+      { dys: [-1, 1, -1, 1].map(d => d * 26 * lt) });
+  },
+
+  // 7  "made with AI." snaps back together
+  (lt) => {
+    const size = fit(D('made with AI.'), 1400, DISPLAY(), 240);
+    words(ctx, [D('made'), D('with'), D('AI.')], W / 2, H / 2, size, DISPLAY(), lerp(420, 0, eBack(lt / 0.24)),
+      { colors: [THEME.ink, THEME.ink, THEME.accent] });
+  },
+
+  // 8  B-roll breath, no type
+  (lt) => {
+    cover(ctx, IMG.work3, 0, 0, W, H, { scale: lerp(1.0, 1.16, eOut(lt)), ox: lerp(40, -40, lt) });
+    vignette(0.45);
+  },
+
+  // 9  the brief, flat and plain
+  (lt) => {
+    line(ctx, 'You bring the brief.', 260, H / 2, 64, BODY(), { align: 'left', dx: -8 * lt });
+  },
+
+  // 10 "I bring"
+  (lt) => line(ctx, D('I bring'), W / 2, H / 2, fit(D('I bring'), 1700, DISPLAY(), 520), DISPLAY(), slam(lt, 0.14, 0.17, 14)),
+
+  // 11 "the story," with the work inside the letters
+  (lt) => masked(D('the story,'), W / 2, H / 2, fit(D('the story,'), 1650, DISPLAY(), 380), DISPLAY(),
+    IMG.work1, { scale: lerp(1.05, 1.16, lt), filter: 'brightness(1.35) contrast(1.05)' },
+    { scale: 1 + 0.05 * (1 - eOut(lt / 0.2)) }),
+
+  // 12 "the direction," with a hard push
+  (lt) => masked(D('the direction,'), W / 2, H / 2, fit(D('the direction,'), 1700, DISPLAY(), 380), DISPLAY(),
+    IMG.work4, { scale: lerp(1.0, 1.28, eOut(lt)), filter: 'brightness(1.35) contrast(1.05)' },
+    { scale: 1 + 0.05 * (1 - eOut(lt / 0.2)) }),
+
+  // 13 "and the finish." lands, then scatters
+  (lt) => {
+    const text = D('and the finish.');
+    const size = fit(text, 1500, DISPLAY(), 260);
+    const s = slam(lt, 0.1);
+    const p = eIn((lt - 0.38) / 0.62);
+    chars(ctx, text, W / 2 + s.dx, H / 2 + s.dy, size, DISPLAY(), (i) => {
+      const r = rng(500 + i);
+      const a = r() * Math.PI * 2, d = 600 + r() * 1100;
+      return { dx: Math.cos(a) * d * p, dy: Math.sin(a) * d * p, rot: (r() - .5) * 1.4 * p };
+    });
+  },
+
+  // 14 reassembles as "Story. Direction. Finish."
+  (lt) => {
+    const rows = [D('Story.'), D('Direction.'), D('Finish.')];
+    const size = Math.min(fit(rows[1], 1250, DISPLAY()), 225);
+    const p = eOut(lt / 0.5);
+    rows.forEach((row, k) => {
+      chars(ctx, row, W / 2, H / 2 + (k - 1) * size * 1.02, size, DISPLAY(), (i) => {
+        const r = rng(800 + k * 50 + i);
+        const a = r() * Math.PI * 2, d = 700 + r() * 900;
+        return { dx: Math.cos(a) * d * (1 - p), dy: Math.sin(a) * d * (1 - p), rot: (r() - .5) * 1.4 * (1 - p) };
+      });
+    });
+  },
+
+  // 15 three panels sliding against each other
+  (lt) => {
+    const imgs = [IMG.work1, IMG.work2, IMG.work5];
+    imgs.forEach((img, i) => {
+      const dir = i % 2 ? 1 : -1;
+      const enter = eOut((lt - i * 0.07) / 0.28);
+      const y = dir * (1 - enter) * H;
+      cover(ctx, img, i * 640, y, 640, H, { scale: 1.3, oy: dir * lerp(-110, 110, lt) });
+    });
+    vignette(0.4);
+  },
+
+  // 16 "Cinematic" with the hero inside the letters
+  (lt) => masked(D('Cinematic'), W / 2, H / 2, fit(D('Cinematic'), 1760, DISPLAY()), DISPLAY(),
+    IMG.hero, { scale: lerp(1.0, 1.12, lt), filter: 'brightness(1.35) contrast(1.05)' },
+    { scale: 1 + 0.06 * (1 - eOut(lt / 0.18)) }),
+
+  // 17 "brand films." punched in hard
+  (lt) => line(ctx, D('brand films.'), W / 2, H / 2, fit(D('brand films.'), 1600, DISPLAY(), 340), DISPLAY(), slam(lt, 0.16, 0.15, 18)),
+
+  // 18 "Directed,"
+  (lt) => line(ctx, D('Directed,'), W / 2, H / 2, fit(D('Directed,'), 1500, DISPLAY(), 340), DISPLAY(), slam(lt, 0.14)),
+
+  // 19 "not generated." lands heavy, the answer to the cold open
+  (lt) => line(ctx, D('not generated.'), W / 2, H / 2, fit(D('not generated.'), 1640, DISPLAY(), 340), DISPLAY(), slam(lt, 0.2, 0.2, 20)),
+
+  // 20 the peak: the full line over the strongest frame
+  (lt) => {
+    cover(ctx, IMG.work5, 0, 0, W, H, { scale: lerp(1.0, 1.06, lt), filter: 'brightness(0.6)' });
+    vignette(0.6);
+    const s = slam(lt, 0.1, 0.17, 12);
+    const big = fit(D('Cinematic brand films.'), 1500, DISPLAY(), 175);
+    line(ctx, D('Cinematic brand films.'), W / 2, H / 2 - big * 0.42, big, DISPLAY(), s);
+    line(ctx, D('Directed, not generated.'), W / 2, H / 2 + big * 0.62, big * 0.42, DISPLAY(), s);
+  },
+
+  // 21 every frame cascades through at full speed
+  (lt) => {
+    const list = [IMG.hero, IMG.work1, IMG.home, IMG.work2, IMG.work3, IMG.work4, IMG.work5];
+    list.forEach((img, i) => {
+      const r = rng(2100 + i);
+      const w = 620 + r() * 380, h = w * 9 / 16;
+      const y = 60 + r() * (H - 120 - h);
+      const p = (lt - i * 0.085 + 0.12) / 0.62;
+      if (p <= 0 || p >= 1) return;
+      const x = lerp(W + 40, -w - 40, p);
+      ctx.save();
+      ctx.translate(x + w / 2, y + h / 2);
+      ctx.rotate((r() - .5) * 0.07);
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 40;
+      ctx.fillStyle = '#000';
+      ctx.fillRect(-w / 2, -h / 2, w, h);
+      ctx.shadowColor = 'transparent';
+      cover(ctx, img, -w / 2, -h / 2, w, h, { scale: 1.05 });
+      ctx.restore();
+    });
+  },
+
+  // 22-23 the exhale: black
+  () => {},
+  () => {},
+
+  // 24-29 end card, quiet
+  (lt) => endCard(lt, 0, 0),
+  (lt) => endCard(1, lt, 0),
+  () => endCard(1, 1, 0),
+  () => endCard(1, 1, 0),
+  (lt) => endCard(1, 1, lt),
+  () => endCard(1, 1, 1)
+];
+
+function endCard(a1, a2, a3) {
+  const fade = x => eInOut(x / 0.6);
+  line(ctx, END1, W / 2, H / 2 - 110, 76, BODY(), { alpha: fade(a1) });
+  line(ctx, END2, W / 2, H / 2 - 10, 76, BODY(), { alpha: fade(a2) });
+  const nameO = Object.assign(BODY(), { track: THEME.nameTrack, weight: Math.max(THEME.bodyWeight, 500) });
+  line(ctx, THEME.name.toUpperCase(), W / 2, H / 2 + 165, 28, nameO, { alpha: fade(a3) });
+  line(ctx, THEME.url, W / 2, H / 2 + 220, 26, BODY(), { alpha: fade(a3), color: THEME.muted });
+}
+
+function render(t) {
+  t = clamp(+t || 0, 0, window.DURATION);
+  const sec = Math.min(29, Math.floor(t));
+  const lt = t - sec;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.filter = 'none';
+  ctx.fillStyle = THEME.bg;
+  ctx.fillRect(0, 0, W, H);
+  BEATS[sec](lt, t);
+  if ((t >= 1 && t < 22) || t >= 24) grain(t);
+}
+
+window.seek = async function (t) {
+  await ready;
+  render(t);
+};
+
+window.seek(0);
+
+/* Optional scrubber: open with ?preview */
+if (/[?&]preview\b/.test(location.search)) {
+  const s = document.createElement('input');
+  s.type = 'range'; s.id = 'scrub'; s.min = 0; s.max = window.DURATION; s.step = 1 / 30; s.value = 0;
+  s.addEventListener('input', () => window.seek(+s.value));
+  document.body.appendChild(s);
+}
+</script>
+</body>
+</html>
