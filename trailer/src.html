@@ -444,20 +444,19 @@ const BEATS = [
     rich(ctx, bot, W / 2, H / 2 + size * 0.62, size, slam(lt, 0.14));
   },
 
-  // 6  "that happen to be", set like the site's eyebrow, drifting apart
+  // 6  "that happen to be" rises as the eyebrow, "made with AI." snaps together under it
   (lt) => {
     glow();
-    const list = ['THAT', 'HAPPEN', 'TO', 'BE'].map(t => ({ t, o: EYEBROW, c: 'rgba(232,230,222,0.7)' }));
-    words(ctx, list, W / 2, H / 2, 40, lerp(10, 150, eOut(lt)), { dys: [-1, 1, -1, 1].map(d => d * 26 * lt) });
+    const size = fitSegs([{ t: 'made with AI.', o: SANS_BOLD }], 1400, 240);
+    const brow = rise(lt, 0.35, 16);
+    rich(ctx, seg('THAT HAPPEN TO BE', Object.assign({}, EYEBROW, { track: 0.3 }), 'rgba(232,230,222,0.7)'),
+      W / 2, H / 2 - size * 0.78, 34, { alpha: brow.alpha, dy: brow.dy });
+    const list = [{ t: 'made', o: SANS_BOLD }, { t: 'with', o: SANS_BOLD }, { t: 'AI.', o: SANS_BOLD, c: THEME.gold }];
+    words(ctx, list, W / 2, H / 2 + size * 0.12, size, lerp(420, 0, eBack((lt - 0.06) / 0.24)));
   },
 
-  // 7  "made with AI." snaps back together
-  (lt) => {
-    glow();
-    const list = [{ t: 'made', o: SANS_BOLD }, { t: 'with', o: SANS_BOLD }, { t: 'AI.', o: SANS_BOLD, c: THEME.gold }];
-    const size = fitSegs([{ t: 'made with AI.', o: SANS_BOLD }], 1400, 240);
-    words(ctx, list, W / 2, H / 2, size, lerp(420, 0, eBack(lt / 0.24)));
-  },
+  // 7  B-roll: the crowd, cold and moving, before the warm stall
+  (lt) => heroFrame(IMG.crowd, { scale: lerp(1.12, 1.0, eOut(lt)), ox: lerp(-50, 50, lt) }, { scrim: 0.15, floor: 0.35 }),
 
   // 8  B-roll breath, no type
   (lt) => heroFrame(IMG.stall, { scale: lerp(1.0, 1.14, eOut(lt)), ox: lerp(40, -40, lt) }, { scrim: 0.15, floor: 0.35 }),
@@ -611,10 +610,7 @@ const BEATS = [
     closingLine(1, 1);
   },
 
-  // 25 the frame cuts away, the line stays alone
-  (lt) => { glow(); closingLine(1, 1); },
-
-  // 26 the video wall: the work deals out of a stack into a row, a hover sweeps across it
+  // 25 the video wall: the work deals out of a stack into a row, a hover sweeps across it
   (lt) => {
     glow();
     const rects = wallRects(lt);
@@ -632,7 +628,7 @@ const BEATS = [
     });
   },
 
-  // 27 the camera dives into the hero film and it takes the frame
+  // 26 the camera dives into the hero film and it takes the frame
   (lt) => {
     glow();
     const rects = wallRects(1 + lt);
@@ -657,9 +653,10 @@ const BEATS = [
     if (lt > 0.45) frameScrims(0.75, 0.9, eInOut((lt - 0.45) / 0.55));
   },
 
-  // 28-29 the end card: portrait, role, name, URL
+  // 27-29 the end card: portrait, statement, name, URL
   (lt) => endCard(lt),
-  (lt) => endCard(1 + lt)
+  (lt) => endCard(1 + lt),
+  (lt) => endCard(2 + lt)
 ];
 
 /* The Work page's video tiles: two 16:9 films, three 9:16, the hero footage at the centre. */
@@ -671,7 +668,7 @@ const WALL = [
   { img: 'carnival', r: 9 / 16 }
 ];
 
-/* u = seconds since 26. The row drifts left the whole time. */
+/* u = seconds since 25. The row drifts left the whole time. */
 function wallRects(u) {
   const ph = 500, lw = 560, gap = 32;
   const stagger = [-44, 34, 0, -34, 44];
@@ -685,7 +682,7 @@ function wallRects(u) {
   });
 }
 
-/* u = seconds since 26; the hero footage starts playing as the wall appears. */
+/* u = seconds since 25; the hero footage starts playing as the wall appears. */
 function clipFrame(u) {
   return CLIP_CACHE.get(clipIndex(u));
 }
@@ -788,7 +785,7 @@ function inkLeft(text, size, o) {
   return ctx.measureText(text).actualBoundingBoxLeft;
 }
 
-/* u = seconds since 28. */
+/* u = seconds since 27. */
 function endCard(u) {
   glow();
   const CARD = cardLayout();
@@ -804,7 +801,7 @@ function endCard(u) {
   roundRect(ctx, p.x, p.y, p.w, p.h, p.r);
   ctx.fill();
   ctx.shadowColor = 'transparent';
-  cover(ctx, IMG.portrait, p.x, p.y, p.w, p.h, { radius: p.r, scale: lerp(1.08, 1.0, eOut(u / 2)) });
+  cover(ctx, IMG.portrait, p.x, p.y, p.w, p.h, { radius: p.r, scale: lerp(1.08, 1.0, eOut(u / 3)) });
   ctx.restore();
 
   // Text block: role, name, URL, stacked by cap height and centred on the
@@ -845,7 +842,7 @@ function render(t) {
 window.seek = async function (t) {
   await ready;
   const c = clamp(+t || 0, 0, window.DURATION);
-  if (c >= 26 && c < 28) await ensureClip(clipIndex(c - 26));
+  if (c >= 25 && c < 27) await ensureClip(clipIndex(c - 25));
   render(t);
 };
 
