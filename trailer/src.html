@@ -392,8 +392,8 @@ function coldLine(t, s = { scale: 1, dx: 0, dy: 0 }) {
 
 /* ---------- cold open: a wall of the work under a sweeping light ---------- */
 
-const WALL_KEYS = ['film', 'gown', 'anat1', 'elf1', 'stall', 'hero', 'stryde', 'family',
-  'anat2', 'elf7', 'fomin', 'couple', 'lips', 'crowd', 'anat3', 'home'];
+const WALL_KEYS = ['film', 'gown', 'anat1', 'elf1', 'stall', 'hero', 'family',
+  'anat2', 'elf7', 'couple', 'lips', 'crowd', 'anat3', 'home'];
 const WALL_CELL = { w: 340, h: 220, gap: 18, cols: 9, rows: 7 };
 let WALL_DIM = null, WALL_LIT = null;
 
@@ -499,6 +499,28 @@ function coldScene(t) {
   coldWall(t);
   SLOTS.forEach((sl, i) => evidence(sl, eSite((t - 2 - i * 0.1) / 0.45)));
   coldLine(t);
+}
+
+/* 21s reel: three rows of photographic frames, one height, one gutter.
+   960px of rows centred in the frame leaves equal 60px margins top and bottom.
+   Rows run left, right, left so neighbours slide against each other. */
+const REEL = { h: 300, gap: 30, y: [60, 390, 720] };
+const REEL_ROWS = [
+  { dir: -1, dist: 900, x0: -140, keys: [['hero'], ['set05', 1], ['crowd'], ['elf1', 1], ['film'], ['set04', 1], ['anat3']] },
+  { dir: 1, dist: 1000, x0: -1060, keys: [['couple'], ['elf7', 1], ['anat1'], ['family', 1], ['lips'], ['set07', 1], ['spoon']] },
+  { dir: -1, dist: 1000, x0: -100, keys: [['stall'], ['gown', 1], ['anat4'], ['elf9', 1], ['anat2'], ['elf4', 1], ['cup']] }
+];
+
+function reelCard(img, x, y, w, h) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(0,0,0,0.55)';
+  ctx.shadowBlur = 30;
+  ctx.shadowOffsetY = 14;
+  ctx.fillStyle = '#182444';
+  roundRect(ctx, x, y, w, h, THEME.cardRadius);
+  ctx.fill();
+  ctx.restore();
+  cover(ctx, img, x, y, w, h, { radius: THEME.cardRadius });
 }
 
 const BEATS = [
@@ -684,28 +706,17 @@ const BEATS = [
     rich(ctx, l2, x, H - 300 + size * 1.08, size, Object.assign({ align: 'left' }, s));
   },
 
-  // 21 every frame cascades through at full speed
+  // 21 three rows of the work run in alternating directions, accelerating into the cut
   (lt) => {
-    const list = [IMG.home, IMG.gown, IMG.anat2, IMG.elf7, IMG.thesis, IMG.fomin, IMG.hero, IMG.family];
-    list.forEach((img, i) => {
-      const r = rng(2100 + i);
-      const w = 620 + r() * 380, h = w * 9 / 16;
-      const y = 60 + r() * (H - 120 - h);
-      const p = (lt - i * 0.075 + 0.12) / 0.6;
-      if (p <= 0 || p >= 1) return;
-      const x = lerp(W + 40, -w - 40, p);
-      ctx.save();
-      ctx.translate(x + w / 2, y + h / 2);
-      ctx.rotate((r() - .5) * 0.07);
-      ctx.shadowColor = 'rgba(0,0,0,0.65)';
-      ctx.shadowBlur = 40;
-      ctx.shadowOffsetY = 18;
-      ctx.fillStyle = THEME.bg;
-      roundRect(ctx, -w / 2, -h / 2, w, h, THEME.cardRadius);
-      ctx.fill();
-      ctx.shadowColor = 'transparent';
-      cover(ctx, img, -w / 2, -h / 2, w, h, { scale: 1.04, radius: THEME.cardRadius });
-      ctx.restore();
+    glow();
+    const ramp = 0.3 * lt + 0.7 * lt * lt;
+    REEL_ROWS.forEach((row, r) => {
+      let x = row.x0 + row.dir * row.dist * ramp;
+      row.keys.forEach(([key, portrait]) => {
+        const w = portrait ? REEL.h * 4 / 5 : REEL.h * 16 / 9;
+        if (x < W && x + w > 0) reelCard(IMG[key], x, REEL.y[r], w, REEL.h);
+        x += w + REEL.gap;
+      });
     });
   },
 
