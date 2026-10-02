@@ -760,12 +760,12 @@ function closingLine(a, b) {
    16px corners beside the text, a 64px gutter between them. The portrait takes
    the height of 5 columns of a 1440px, 12 column grid; the portrait and text
    are centred together as one group, and the frame margins match top and bottom. */
-const ROLE = 'CREATIVE DIRECTOR · AI FILMMAKER';
+const ROLE = 'My camera is AI.';
 const NAME = 'Muneeb Arif';
-const ROLE_O = Object.assign({}, EYEBROW, { track: 0.2 });
+const ROLE_O = Object.assign({}, SERIF, { k: 1 });
 const NAME_O = Object.assign({}, SANS);
 const URL_O = Object.assign({}, SANS, { track: 0.05 });
-const CARD_SIZES = { role: 22, name: 120, url: 32 };
+const CARD_SIZES = { role: 48, name: 120, url: 32 };
 
 function cardLayout() {
   const container = 1440, cols = 12, gutter = 64;
@@ -816,7 +816,7 @@ function endCard(u) {
   const block = caps.role + gapA + caps.name + gapB + caps.url;
   let top = p.y + p.h / 2 - block / 2;
   const rows = [
-    ['role', ROLE, roleO, 'rgba(232,230,222,0.7)', 0.15],
+    ['role', ROLE, roleO, THEME.ember, 0.15],
     ['name', NAME, nameO, THEME.heading, 0.23],
     ['url', THEME.url, urlO, THEME.gold, 0.35]
   ];
