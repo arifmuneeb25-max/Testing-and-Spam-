@@ -5,6 +5,10 @@ same whole-second grid as the picture in trailer/src.html, so it can be laid
 straight under a render of muneeb-trailer.html. It is a timing and dynamics
 guide: swap the synthesised hits and whooshes for library sounds in the edit.
 
+The background score lives in trailer/music.py and is mixed in under the
+effects, ducking under each hit. Also writes audio/stem-fx.wav and
+audio/stem-music.wav, level-matched, for the edit.
+
 Run from the repo root: python3 trailer/sound.py   (needs numpy and scipy)
 
 Cue sheet
@@ -146,7 +150,7 @@ t = t_axis(bed_d)
 bed = (np.sin(2 * np.pi * 55 * t) + 0.6 * np.sin(2 * np.pi * 82.4 * t + 1) + 0.35 * np.sin(2 * np.pi * 110.3 * t + 2))
 bed += 0.25 * filt(rng.standard_normal(len(t)), "lowpass", 160)
 bed *= 10 ** ((-26 + 12 * (t / bed_d) ** 1.5) / 20) * np.minimum(1, t / 0.05)
-place(bed, 0.0, gain=1.0)
+place(bed, 0.0, gain=0.5)  # halved: the score's pad carries the low end now
 
 # ---- cold open: the film starts on the slam ----
 place(impact(1.3), 0.0, 1.0, 0, verb=0.5)
@@ -268,6 +272,41 @@ R += fftconvolve(send_R, ir_r)[:N] * 0.6
 L[cut:int(23.0 * SR)] = 0  # keep the exhale truly silent
 R[cut:int(23.0 * SR)] = 0
 
+# ---- background score (trailer/music.py), ducked under the effects ----
+import sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from music import build_music
+
+ML, MR = build_music(SR, N)
+mpeak = max(np.max(np.abs(ML)), np.max(np.abs(MR)))
+ML, MR = ML / mpeak, MR / mpeak
+win = int(0.04 * SR)
+fx_env = np.convolve(np.abs(L) + np.abs(R), np.ones(win) / win, mode="same")
+fx_env /= np.percentile(fx_env, 99.5)
+duck = 1 - 0.45 * np.clip(fx_env, 0, 1)
+fxpeak = max(np.max(np.abs(L)), np.max(np.abs(R)))
+MUSIC = 0.85 * fxpeak  # the score sits a few dB under the hits
+music_L, music_R = ML * duck * MUSIC, MR * duck * MUSIC
+
+
+def write(path, stereo):
+    path.parent.mkdir(exist_ok=True)
+    pcm = (np.clip(stereo, -1, 1).T * 32767).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(2)
+        w.setsampwidth(2)
+        w.setframerate(SR)
+        w.writeframes(pcm.tobytes())
+
+
+# stems for the edit, level-matched to each other
+stem_scale = 10 ** (-1 / 20) / max(fxpeak, np.max(np.abs(music_L)), np.max(np.abs(music_R)))
+audio_dir = pathlib.Path(__file__).resolve().parent / "audio"
+write(audio_dir / "stem-fx.wav", np.stack([L, R]) * stem_scale)
+write(audio_dir / "stem-music.wav", np.stack([music_L, music_R]) * stem_scale)
+L = L + music_L
+R = R + music_R
+
 # ---- master: high-pass rumble, soft clip, normalise, fade the last 0.4s ----
 mix = np.stack([filt(L, "highpass", 28), filt(R, "highpass", 28)])
 mix = np.tanh(mix / (np.max(np.abs(mix)) * 0.7))
@@ -279,12 +318,6 @@ f10 = int(0.01 * SR)
 mix[:, cut - f10:cut] *= np.linspace(1, 0, f10)
 mix[:, cut:int(23.0 * SR)] = 0
 
-out = pathlib.Path(__file__).resolve().parent / "audio" / "temp-score.wav"
-out.parent.mkdir(exist_ok=True)
-pcm = (mix.T * 32767).astype("<i2")
-with wave.open(str(out), "wb") as w:
-    w.setnchannels(2)
-    w.setsampwidth(2)
-    w.setframerate(SR)
-    w.writeframes(pcm.tobytes())
-print(f"wrote {out} ({DUR:.0f}s, {SR} Hz stereo)")
+out = audio_dir / "temp-score.wav"
+write(out, mix)
+print(f"wrote {out} ({DUR:.0f}s, {SR} Hz stereo) and the fx / music stems")
