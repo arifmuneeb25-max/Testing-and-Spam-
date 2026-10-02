@@ -8,10 +8,10 @@ guide: swap the synthesised hits and whooshes for library sounds in the edit.
 Run from the repo root: python3 trailer/sound.py   (needs numpy and scipy)
 
 Cue sheet
-  0.0   silence (total darkness)
+  0.0   silence; 0.4 a low swell as the wall of work surfaces
   1.0   big impact + sub: the cold open line slams in; drone bed starts
-  2.0   two paper tears, left then right: the evidence frames
-  3.05  rip, panned left to right: the strip swallows the line
+  2.0   two pulls with paper tears, left then right: frames come off the wall
+  3.12  heavy slide to both sides and a low boom: the frame splits on the hero
   4,5   impacts: "I direct" / "stories."
   6.3   snap hit: "made with AI." locks together
   7.0   whoosh right to left into the crowd; 8.0 softer whoosh into the stall
@@ -143,12 +143,20 @@ bed *= 10 ** ((-26 + 12 * (t / bed_d) ** 1.5) / 20) * np.minimum(1, t / 0.4)
 place(bed, 1.0, gain=1.0)
 
 # ---- cold open ----
+# the wall surfaces out of the dark: a low swell of air
+place(whoosh(0.6, 120, 700, shape=0.95), 0.4, 0.45, verb=0.3)
 place(impact(1.3), 1.0, 1.0, 0, verb=0.5)
-place(tear(), 2.0, 0.8, -0.6, verb=0.3)
-place(tear(), 2.12, 0.8, 0.6, verb=0.3)
-rip = whoosh(0.85, 400, 3200, shape=0.55)
-for k, seg in enumerate(np.array_split(rip, 8)):
-    place(seg, 3.05 + k * 0.85 / 8, 0.9, -0.9 + 1.8 * k / 7, verb=0.2)
+# two frames pulled off the wall, top left then bottom right, each with a paper tear
+place(whoosh(0.4, 600, 2600, shape=0.7), 2.0, 0.5, -0.6, verb=0.2)
+place(tear(), 2.12, 0.6, -0.6, verb=0.3)
+place(whoosh(0.4, 600, 2600, shape=0.7), 2.1, 0.5, 0.6, verb=0.2)
+place(tear(), 2.22, 0.6, 0.6, verb=0.3)
+# the frame splits through the line: a heavy slide opening out to both sides, a low boom
+# two independent noise layers, one per side, so the opening reads wide
+place(whoosh(0.8, 1800, 160, shape=0.25), 3.12, 0.6, -0.5, verb=0.3)
+place(whoosh(0.8, 1800, 160, shape=0.25), 3.12, 0.6, 0.5, verb=0.3)
+t = t_axis(1.6)
+place(np.sin(2 * np.pi * np.cumsum(70 * (36 / 70) ** (t / 1.6)) / SR) * np.exp(-t / 0.6), 3.12, 0.8, verb=0.3)
 
 # ---- kinetic showcase ----
 place(impact(0.9), 4.0, 0.9, verb=0.4)
