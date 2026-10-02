@@ -13,7 +13,7 @@ Cue sheet
   2.0   two pulls with paper tears, left then right: frames come off the wall
   3.12  heavy slide to both sides and a low boom: the frame splits on the hero
   4,5   impacts: "I direct" / "stories."
-  6.3   snap hit: "made with AI." locks together
+  6.3   three hits at 6.30, 6.40, 6.52: "made", "with", "AI." land one by one
   7.0   whoosh right to left into the crowd; 8.0 softer whoosh into the stall
   9.0   nothing but the drone: "You bring the brief."
   10-13 impacts, with a push whoosh at 12 and a scatter whoosh at 13.38
@@ -165,8 +165,11 @@ place(np.sin(2 * np.pi * np.cumsum(70 * (36 / 70) ** (t / 1.6)) / SR) * np.exp(-
 # ---- kinetic showcase ----
 place(impact(0.9), 4.0, 0.9, verb=0.4)
 place(impact(1.0), 5.0, 0.9, verb=0.5)
-place(whoosh(0.24, 200, 1500, shape=0.95), 6.06, 0.6)
-place(impact(0.5), 6.30, 0.7, verb=0.3)
+# 6: the banner pulls back under a soft swell; "made", "with", "AI." land one after another
+place(whoosh(0.5, 900, 250, shape=0.2), 6.0, 0.35, verb=0.3)
+place(impact(0.45), 6.30, 0.65, -0.3, verb=0.3)
+place(impact(0.45), 6.40, 0.65, 0.0, verb=0.3)
+place(impact(0.8), 6.52, 0.9, 0.3, verb=0.4)
 place(whoosh(0.7, 2500, 400, shape=0.3), 7.0, 0.55, 0.6, verb=0.2)
 place(whoosh(0.6, 1800, 300, shape=0.3), 8.0, 0.4, -0.5, verb=0.2)
 place(impact(1.0), 10.0, 0.95, verb=0.5)

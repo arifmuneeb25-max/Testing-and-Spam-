@@ -615,15 +615,53 @@ const BEATS = [
     rich(ctx, bot, W / 2, H / 2 + size * 0.62, size, slam(lt, 0.14));
   },
 
-  // 6  "that happen to be" rises as the eyebrow, "made with AI." snaps together under it
+  // 6  the About banner pulls back; "that happen to be" rises word by word, then
+  //    "made", "with", "AI." slam in one after another, top left over the dark wall
   (lt) => {
-    glow();
-    const size = fitSegs([{ t: 'made with AI.', o: SANS_BOLD }], 1400, 240);
-    const brow = rise(lt, 0.35, 16);
-    rich(ctx, seg('THAT HAPPEN TO BE', Object.assign({}, EYEBROW, { track: 0.3 }), 'rgba(232,230,222,0.7)'),
-      W / 2, H / 2 - size * 0.78, 34, { alpha: brow.alpha, dy: brow.dy });
-    const list = [{ t: 'made', o: SANS_BOLD }, { t: 'with', o: SANS_BOLD }, { t: 'AI.', o: SANS_BOLD, c: THEME.gold }];
-    words(ctx, list, W / 2, H / 2 + size * 0.12, size, lerp(420, 0, eBack((lt - 0.06) / 0.24)));
+    cover(ctx, IMG.about, 0, 0, W, H, { scale: lerp(1.14, 1.04, eOut(lt)), ox: lerp(40, 0, eOut(lt)), oy: 30 });
+    const lr = ctx.createLinearGradient(0, 0, W, 0);
+    lr.addColorStop(0, 'rgba(10,15,28,0.7)');
+    lr.addColorStop(0.55, 'rgba(10,15,28,0.25)');
+    lr.addColorStop(1, 'rgba(10,15,28,0)');
+    ctx.fillStyle = lr;
+    ctx.fillRect(0, 0, W, H);
+    const tb = ctx.createLinearGradient(0, 0, 0, H);
+    tb.addColorStop(0, 'rgba(10,15,28,0.65)');
+    tb.addColorStop(0.5, 'rgba(10,15,28,0)');
+    ctx.fillStyle = tb;
+    ctx.fillRect(0, 0, W, H);
+
+    const x = 120;
+    const s1 = 76, o1 = SERIF;
+    const words1 = ['that', 'happen', 'to', 'be'];
+    const cap1 = capHeight(ctx, s1, o1);
+    const y1 = 150 + cap1 / 2;
+    const sp1 = segWidth(ctx, ' ', s1, o1);
+    let wx = x + inkLeft('that', s1, o1);
+    words1.forEach((w, i) => {
+      const r = rise(lt - 0.04 - i * 0.06, 0.45, 22);
+      rich(ctx, seg(w, o1, THEME.ember), wx, y1, s1, { align: 'left', alpha: r.alpha, dy: r.dy });
+      wx += segWidth(ctx, w, s1, o1) + sp1;
+    });
+
+    const o2 = SANS_BOLD;
+    const s2 = fitSegs(seg('made with AI.'), 1000, 190);
+    const cap2 = capHeight(ctx, s2, o2);
+    const y2 = 150 + cap1 + 44 + cap2 / 2;
+    const sp2 = segWidth(ctx, ' ', s2, o2);
+    let vx = x + inkLeft('made', s2, o2);
+    [['made', THEME.heading, 0.3, 0.12], ['with', THEME.heading, 0.4, 0.12], ['AI.', THEME.gold, 0.52, 0.2]].forEach(([w, c, at, amp]) => {
+      const ww = segWidth(ctx, w, s2, o2);
+      if (lt >= at) {
+        const sl = slam(lt - at, amp, 0.12, amp * 60);
+        ctx.save();
+        ctx.translate(vx + ww / 2 + sl.dx, y2 + sl.dy);
+        ctx.scale(sl.scale, sl.scale);
+        rich(ctx, seg(w, o2, c), -ww / 2, 0, s2, { align: 'left' });
+        ctx.restore();
+      }
+      vx += ww + sp2;
+    });
   },
 
   // 7  B-roll: the crowd, cold and moving, before the warm stall
