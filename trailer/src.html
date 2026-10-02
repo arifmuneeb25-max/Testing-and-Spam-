@@ -732,7 +732,9 @@ const BEATS = [
     const img = IMG.workpage;
     const sc = card.w / img.naturalWidth;
     const maxScroll = img.naturalHeight * sc - card.h;
-    const scroll = maxScroll * eInOut((lt - 0.2) / 0.8);
+    // the page scrolls one step as each word lands
+    const lands = [0.4, 0.58, 0.76];
+    const scroll = maxScroll * lands.reduce((a, l) => a + eSite((lt - l) / 0.35) / 3, 0);
     ctx.save();
     roundRect(ctx, cx, card.y, card.w, card.h, card.r);
     ctx.clip();
@@ -740,17 +742,28 @@ const BEATS = [
     ctx.restore();
     ctx.restore();
 
-    // the three words, left aligned on the 120px edge, letters flying back in from the scatter
+    // the three words, left aligned on the 120px edge: each flies back in from the
+    // scatter in turn, punches as it lands, then drifts so the stack never sits still
     const rows = [['Story.', SANS_BOLD, THEME.heading], ['Direction.', SANS_BOLD, THEME.heading], ['Finish.', SERIF, THEME.gold]];
     const size = fitSegs(seg('Direction.'), 780, 200);
-    const p = eOut(lt / 0.5);
     rows.forEach(([text, o, c], k) => {
+      const start = k * 0.18, land = lands[k];
+      const p = eOut((lt - start) / (land - start));
+      const after = Math.max(0, lt - land);
+      const punch = lt >= land ? 1 + 0.07 * Math.exp(-after * 14) : 1;
+      const drift = (k % 2 ? -1 : 1) * 16 * eInOut(after / (1 - land));
+      const cy = H / 2 + (k - 1) * size * 1.08;
       const cxRow = 120 + inkLeft(text, size, o) + segWidth(ctx, text, size, o) / 2;
-      chars(ctx, text, cxRow, H / 2 + (k - 1) * size * 1.08, size, o, c, i => {
+      ctx.save();
+      ctx.translate(120 + drift, cy);
+      ctx.scale(punch, punch);
+      ctx.translate(-120, -cy);
+      chars(ctx, text, cxRow, cy, size, o, c, i => {
         const r = rng(800 + k * 50 + i);
         const a = r() * Math.PI * 2, d = 700 + r() * 900;
-        return { dx: Math.cos(a) * d * (1 - p), dy: Math.sin(a) * d * (1 - p), rot: (r() - .5) * 1.4 * (1 - p) };
+        return { dx: Math.cos(a) * d * (1 - p), dy: Math.sin(a) * d * (1 - p), rot: (r() - .5) * 1.4 * (1 - p), alpha: lt < start ? 0 : 1 };
       });
+      ctx.restore();
     });
   },
 

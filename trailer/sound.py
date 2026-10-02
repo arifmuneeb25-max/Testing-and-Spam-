@@ -17,7 +17,7 @@ Cue sheet
   7.0   whoosh right to left into the crowd; 8.0 softer whoosh into the stall
   9.0   nothing but the drone: "You bring the brief."
   10-13 impacts, with a push whoosh at 12 and a scatter whoosh at 13.38
-  14    reverse swell into a small hit at 14.5: the letters reassemble; a whoosh
+  14    reverse swell, then three hits at 14.40, 14.58, 14.76 as the words land; a whoosh
         from the right as the Work page card slides in
   15    three panel whooshes
   16    letters rise with an upward sweep, soft hit at 16.32
@@ -179,8 +179,10 @@ place(impact(0.7), 12.0, 0.8, verb=0.4)
 place(whoosh(0.8, 300, 1200, shape=0.4), 12.0, 0.4)
 place(impact(0.8), 13.0, 0.85, verb=0.4)
 place(whoosh(0.62, 600, 5000, shape=0.6), 13.38, 0.6, -0.4, verb=0.3)
-place(whoosh(0.5, 5000, 600, shape=0.95), 14.0, 0.5, 0.4)
-place(impact(0.45), 14.5, 0.7, verb=0.4)
+place(whoosh(0.4, 5000, 600, shape=0.95), 14.0, 0.45, 0.4)
+# 14: the three words land one after another, the Work page scrolls a step with each
+for k, at in enumerate((14.40, 14.58, 14.76)):
+    place(impact(0.35 + 0.1 * k), at, 0.6 + 0.08 * k, -0.3, verb=0.35)
 place(whoosh(0.55, 350, 1600, shape=0.45), 14.0, 0.35, 0.6, verb=0.2)  # the Work page card slides in from the right
 for k in range(3):
     place(whoosh(0.4, 1500, 500, shape=0.35), 15.0 + k * 0.07, 0.4, -0.7 + 0.7 * k, verb=0.2)
