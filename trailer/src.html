@@ -94,6 +94,19 @@ function rng(seed) {
 /* ---------- assets ---------- */
 
 const IMG = {};
+
+/* Hero footage frames decode on demand (all 98 at once exceed the browser's
+   decoded-image budget). A small cache keeps neighbouring frames warm. */
+const CLIP_CACHE = new Map();
+const clipIndex = u => Math.min(CLIP.length - 1, Math.max(0, Math.floor(u * CLIP_FPS)));
+async function ensureClip(i) {
+  if (CLIP_CACHE.has(i)) return;
+  const im = new Image();
+  im.src = CLIP[i];
+  await im.decode();
+  CLIP_CACHE.set(i, im);
+  while (CLIP_CACHE.size > 12) CLIP_CACHE.delete(CLIP_CACHE.keys().next().value);
+}
 const GRAIN = [];
 
 function makeGrain() {
@@ -125,6 +138,7 @@ const ready = (async () => {
     await im.decode();
     IMG[k] = im;
   }));
+
   makeGrain();
   await document.fonts.ready;
 })();
@@ -250,9 +264,15 @@ function cover(g, img, x, y, w, h, { scale = 1, ox = 0, oy = 0, filter = null, a
    legibility gradient up from ink. */
 function heroFrame(img, opts, { scrim = 0.75, floor = 0.9 } = {}) {
   const i = THEME.frameInset, r = THEME.frameRadius;
+  cover(ctx, img, i, i, W - 2 * i, H - 2 * i, Object.assign({ radius: r }, opts));
+  frameScrims(scrim, floor);
+}
+
+function frameScrims(scrim, floor, alpha = 1) {
+  const i = THEME.frameInset, r = THEME.frameRadius;
   const x = i, y = i, w = W - 2 * i, h = H - 2 * i;
-  cover(ctx, img, x, y, w, h, Object.assign({ radius: r }, opts));
   ctx.save();
+  ctx.globalAlpha = alpha;
   roundRect(ctx, x, y, w, h, r);
   ctx.clip();
   const lr = ctx.createLinearGradient(x, 0, x + w, 0);
@@ -591,13 +611,129 @@ const BEATS = [
     closingLine(1, 1);
   },
 
-  // 25-29 the frame cuts away, the line stays, the name lands; slow push to the end
+  // 25 the frame cuts away, the line stays alone
+  (lt) => { glow(); closingLine(1, 1); },
+
+  // 26 the video wall: the work deals out of a stack into a row, a hover sweeps across it
+  (lt) => {
+    glow();
+    const rects = wallRects(lt);
+    const order = [0, 4, 1, 3, 2];
+    order.forEach(i => {
+      const p = eSite((lt - [0.1, 0.05, 0, 0.05, 0.1][i]) / 0.55);
+      const r = rects[i];
+      const deck = { x: W / 2 - r.w / 2 + (i - 2) * 10, y: H / 2 - r.h / 2 + (i - 2) * 10 };
+      const hover = clamp(1 - Math.abs(lt - (0.5 + i * 0.1)) / 0.12);
+      videoTile(WALL[i], lerp(deck.x, r.x, p), lerp(deck.y, r.y, p) - 6 * hover, r.w, r.h,
+        { rot: (i - 2) * 0.05 * (1 - p), hover, t: lt });
+      const idx = rise(lt - 0.35 - i * 0.05, 0.5, 12);
+      rich(ctx, seg('0' + (i + 1), Object.assign({}, EYEBROW, { track: 0.22 }), THEME.gold), r.x, r.y + r.h + 34, 16,
+        { align: 'left', alpha: idx.alpha, dy: idx.dy });
+    });
+  },
+
+  // 27 the camera dives into the hero film and it takes the frame
+  (lt) => {
+    glow();
+    const rects = wallRects(1 + lt);
+    const p = eInOut(lt / 0.7);
+    const f = rects[2];
+    const fx = f.x + f.w / 2, fy = f.y + f.h / 2;
+    const i0 = THEME.frameInset;
+    const kx = lerp(1, (W - 2 * i0) / f.w, p), ky = lerp(1, (H - 2 * i0) / f.h, p);
+    const cx = lerp(fx, W / 2, p), cy = lerp(fy, H / 2, p);
+    [0, 4, 1, 3, 2].forEach(i => {
+      const r = rects[i];
+      const x = cx + (r.x - fx) * kx, y = cy + (r.y - fy) * ky;
+      const hero = i === 2;
+      videoTile(WALL[i], x, y, r.w * kx, r.h * ky, {
+        radius: lerp(THEME.cardRadius, hero ? THEME.frameRadius : THEME.cardRadius * 4, p),
+        gold: hero ? 1 - eOut(lt / 0.3) : 0,
+        badge: hero ? 1 - eOut(lt / 0.3) : 1,
+        alpha: hero ? 1 : 1 - p,
+        t: 1 + lt
+      });
+    });
+    if (lt > 0.45) frameScrims(0.75, 0.9, eInOut((lt - 0.45) / 0.55));
+  },
+
+  // 28-29 the film ends where the website begins: the hero, its scrim, the lockup
   (lt) => endCard(lt),
-  (lt) => endCard(1 + lt),
-  (lt) => endCard(2 + lt),
-  (lt) => endCard(3 + lt),
-  (lt) => endCard(4 + lt)
+  (lt) => endCard(1 + lt)
 ];
+
+/* The Work page's video tiles: two 16:9 films, three 9:16, the hero footage at the centre. */
+const WALL = [
+  { img: 'sheet', r: 9 / 16 },
+  { img: 'film', r: 16 / 9 },
+  { clip: true, r: 16 / 9 },
+  { img: 'motoreasy', r: 9 / 16 },
+  { img: 'carnival', r: 9 / 16 }
+];
+
+/* u = seconds since 26. The row drifts left the whole time. */
+function wallRects(u) {
+  const ph = 500, lw = 560, gap = 32;
+  const stagger = [-44, 34, 0, -34, 44];
+  const sizes = WALL.map(t => t.r < 1 ? { w: ph * t.r, h: ph } : { w: lw, h: lw / t.r });
+  const total = sizes.reduce((a, s) => a + s.w, 0) + gap * (sizes.length - 1);
+  let x = (W - total) / 2 + 120 - 150 * u;
+  return sizes.map((s, i) => {
+    const r = { x, y: H / 2 - s.h / 2 + stagger[i], w: s.w, h: s.h };
+    x += s.w + gap;
+    return r;
+  });
+}
+
+/* u = seconds since 26; the hero footage starts playing as the wall appears. */
+function clipFrame(u) {
+  return CLIP_CACHE.get(clipIndex(u));
+}
+
+/* A video tile as the site draws it: 12px card, soft shadow, the play badge. */
+function videoTile(tile, x, y, w, h, { rot = 0, hover = 0, gold = 0, badge = 1, alpha = 1, radius = THEME.cardRadius, t = 0, shade = 0 } = {}) {
+  if (alpha <= 0.001) return;
+  const img = tile.clip ? clipFrame(t) : IMG[tile.img];
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(x + w / 2, y + h / 2);
+  ctx.rotate(rot);
+  ctx.translate(-w / 2, -h / 2);
+  ctx.shadowColor = 'rgba(0,0,0,0.6)';
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 18;
+  ctx.fillStyle = '#182444';
+  roundRect(ctx, 0, 0, w, h, radius);
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  cover(ctx, img, 0, 0, w, h, { radius, scale: 1 + 0.05 * hover });
+  if (shade > 0) {
+    roundRect(ctx, 0, 0, w, h, radius);
+    ctx.fillStyle = `rgba(${THEME.scrim},${shade})`;
+    ctx.fill();
+  }
+  if (badge > 0) {
+    const g = Math.max(hover, gold);
+    const r = clamp(Math.min(w, h) * 0.1, 22, 30);
+    ctx.globalAlpha = alpha * badge;
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0,0,0,${0.3 + 0.2 * g})`;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = g > 0.5 ? `rgba(${THEME.goldRgb},0.8)` : 'rgba(44,58,91,0.5)';
+    ctx.stroke();
+    const s = r * 0.42;
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - s * 0.55, h / 2 - s);
+    ctx.lineTo(w / 2 - s * 0.55, h / 2 + s);
+    ctx.lineTo(w / 2 + s * 0.95, h / 2);
+    ctx.closePath();
+    ctx.fillStyle = g > 0.5 ? THEME.gold : 'rgba(232,230,222,0.7)';
+    ctx.fill();
+  }
+  ctx.restore();
+}
 
 function closingShot(img, opts) {
   heroFrame(img, opts, { scrim: 0.4, floor: 0.6 });
@@ -620,19 +756,17 @@ function closingLine(a, b) {
   if (b > 0) rich(ctx, seg('worth watching.', SERIF, THEME.ember), W / 2, H / 2 - 110 + size * 1.1, size, { alpha: r2.alpha, dy: r2.dy });
 }
 
-/* u = seconds since 25. */
+/* u = seconds since 28. The hero keeps playing under the site's own hero
+   layout: wordmark as the eyebrow, the line as the headline, the URL below. */
 function endCard(u) {
-  glow();
-  const push = 1 + 0.03 * eInOut(u / 5);
-  ctx.save();
-  ctx.translate(W / 2, H / 2);
-  ctx.scale(push, push);
-  ctx.translate(-W / 2, -H / 2);
-  closingLine(1, 1);
-  const r3 = rise(u - 0.15, 0.45, 16), r4 = rise(u - 0.25, 0.45, 16);
-  rich(ctx, seg(THEME.name, Object.assign({}, SANS, { track: 0.28 }), THEME.heading), W / 2, H / 2 + 175, 26, { alpha: r3.alpha, dy: r3.dy });
-  rich(ctx, seg(THEME.url, Object.assign({}, EYEBROW, { track: 0.12 }), THEME.muted), W / 2, H / 2 + 228, 22, { alpha: r4.alpha, dy: r4.dy });
-  ctx.restore();
+  heroFrame(clipFrame(2 + u), { scale: 1 + 0.04 * (u / 2) });
+  const x = THEME.frameInset + 72, size = 84;
+  const steps = [0, 0.08, 0.16, 0.3].map(d => rise(u - d, 0.7, 20));
+  const at = (k, f) => f({ align: 'left', alpha: steps[k].alpha, dy: steps[k].dy });
+  at(0, o => rich(ctx, seg(THEME.name, Object.assign({}, SANS, { track: 0.28 }), 'rgba(232,230,222,0.8)'), x, H - 390, 24, o));
+  at(1, o => rich(ctx, seg("Let's make something", SANS, THEME.heading), x, H - 300, size, o));
+  at(2, o => rich(ctx, seg('worth watching.', SERIF, THEME.ember), x, H - 300 + size * 1.08, size, o));
+  at(3, o => rich(ctx, seg(THEME.url, Object.assign({}, EYEBROW, { track: 0.12 }), THEME.muted), x, H - 118, 22, o));
 }
 
 function render(t) {
@@ -651,6 +785,8 @@ function render(t) {
 
 window.seek = async function (t) {
   await ready;
+  const c = clamp(+t || 0, 0, window.DURATION);
+  if (c >= 26) await ensureClip(clipIndex(c - 26));
   render(t);
 };
 
