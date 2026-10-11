@@ -1,0 +1,286 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Ustaad Samosay Walay end card</title>
+<style>
+  html, body { margin: 0; background: #000; }
+  #stage { position: relative; width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+  #world { position: absolute; inset: 0; transform-origin: 960px 540px; will-change: transform; }
+  #cv, #steam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; }
+  #steam { pointer-events: none; }
+</style>
+
+<div id="stage">
+  <div id="world">
+    <canvas id="cv" width="1920" height="1080"></canvas>
+    <svg id="steam" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="softSteam" x="-40%" y="-20%" width="180%" height="140%">
+          <feGaussianBlur stdDeviation="3.1"/>
+        </filter>
+        <linearGradient id="steamFade" gradientUnits="userSpaceOnUse" x1="0" y1="305" x2="0" y2="125">
+          <stop offset="0"    stop-color="#fff" stop-opacity="0"/>
+          <stop offset="0.14" stop-color="#fff" stop-opacity="0.95"/>
+          <stop offset="0.52" stop-color="#fff" stop-opacity="1"/>
+          <stop offset="0.82" stop-color="#fff" stop-opacity="0.45"/>
+          <stop offset="1"    stop-color="#fff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <g id="wisps" filter="url(#softSteam)"></g>
+    </svg>
+  </div>
+</div>
+
+<script>
+/*__ASSETS__*/
+
+/* ------------------------------------------------------------------ timing */
+const DUR = 5.0;                 // seconds
+const FPS = 30;
+
+const CAM = { from: 1.00, to: 1.04 };
+const SETTLE = 0.03;             // the paint goes down a touch large, then sits down
+const BEATS = {
+  ustaad:  { in: 0.60, out: 1.50, settle: 0.20 },
+  samosay: { in: 1.30, out: 2.30, settle: 0.20 },
+  ribbon:  { in: 2.30, out: 3.10 },
+  studs:   { in: 2.00, out: 3.50, flash: 0.25 },
+  lastGlint: 4.20
+};
+
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const span  = (t, a, b) => clamp((t - a) / (b - a), 0, 1);
+const inOutSine = x => -(Math.cos(Math.PI * x) - 1) / 2;
+const outSine   = x => Math.sin((x * Math.PI) / 2);
+const outQuad   = x => 1 - (1 - x) * (1 - x);
+
+/* ------------------------------------------------------------------ layers */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d', { alpha: false });
+const world = document.getElementById('world');
+const wisps = document.getElementById('wisps');
+
+const plate = new Image();
+const ink = {};
+const LAYERS = LAYOUT.layers;
+const STUDS = LAYOUT.studs;
+const pad = 48;                                  // mask margin, so blur never eats an edge
+
+function surface(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return { c, x: c.getContext('2d') };
+}
+const buf = {}, mask = {}, raw = {};
+for (const name of Object.keys(LAYERS)) {
+  const m = LAYERS[name];
+  buf[name] = surface(m.w, m.h);
+  mask[name] = surface(m.w + pad * 2, m.h + pad * 2);
+  raw[name] = surface(m.w + pad * 2, m.h + pad * 2);   // mask shape before it is softened
+}
+
+// One blur over the finished shape. Blurring each piece as it is drawn would
+// leave the overlaps short of full alpha, and the paint would come out dull.
+function soften(name, radius) {
+  const g = mask[name].x, m = LAYERS[name];
+  g.clearRect(0, 0, m.w + pad * 2, m.h + pad * 2);
+  g.save();
+  g.filter = 'blur(' + radius + 'px)';
+  g.drawImage(raw[name].c, 0, 0);
+  g.restore();
+}
+
+/* A sign painter lays a word down with one loaded brush: the edge that travels
+   is soft and slightly ragged, never a ruled line. Rows of rectangles with
+   offset leading edges, heavily blurred, give exactly that. */
+function brushMask(name, p, seed) {
+  const g = raw[name].x, m = LAYERS[name];
+  const W = m.w + pad * 2, H = m.h + pad * 2;
+  g.clearRect(0, 0, W, H);
+  if (p > 0) {
+    const feather = 52;
+    const lead = pad - feather + p * (m.w + 2 * feather);
+    g.fillStyle = '#fff';
+    const rows = 16, rh = H / rows;
+    for (let i = 0; i < rows; i++) {
+      const wob = Math.sin(i * 1.93 + seed) * 19 + Math.sin(i * 0.71 + seed * 1.7) * 12;
+      const x = lead + wob;
+      if (x > 0) g.fillRect(-140, i * rh - 6, x + 140, rh + 12);
+    }
+  }
+  soften(name, 14);
+}
+
+/* The ribbon is a physical strip: it unrolls from the middle out to both ends. */
+function unrollMask(name, p) {
+  const g = raw[name].x, m = LAYERS[name];
+  const W = m.w + pad * 2, H = m.h + pad * 2;
+  g.clearRect(0, 0, W, H);
+  if (p > 0) {
+    const half = p * (m.w + 56) / 2;
+    g.fillStyle = '#fff';
+    g.fillRect(W / 2 - half, -60, half * 2, H + 120);
+  }
+  soften(name, 11);
+}
+
+function paintLayer(name, scale) {
+  const m = LAYERS[name], b = buf[name];
+  b.x.clearRect(0, 0, m.w, m.h);
+  b.x.drawImage(ink[name], 0, 0);
+  b.x.globalCompositeOperation = 'destination-in';
+  b.x.drawImage(mask[name].c, -pad, -pad);
+  b.x.globalCompositeOperation = 'source-over';
+  const cx = m.x + m.w / 2, cy = m.y + m.h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+  ctx.translate(-cx, -cy);
+  ctx.drawImage(b.c, m.x, m.y);
+  ctx.restore();
+}
+
+/* ------------------------------------------------------------------- steam */
+const STEAM_PERIOD = 2.5;                        // loops cleanly inside the 5s
+const WISPS = [
+  { x: 712, y: 303, len: 176, amp: 34, k: 1.95, ph: 0.00, w: 23, drift:   4, sp: 1.00, op: 0.46 },
+  { x: 698, y: 304, len: 150, amp: 27, k: 1.95, ph: 0.30, w: 15, drift: -11, sp: 1.07, op: 0.31 },
+  { x: 728, y: 301, len: 124, amp: 21, k: 1.95, ph: 0.62, w: 11, drift:  15, sp: 1.14, op: 0.23 }
+];
+for (const w of WISPS) {
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+  p.setAttribute('fill', 'url(#steamFade)');
+  p.setAttribute('fill-opacity', w.op);
+  wisps.appendChild(p);
+  w.node = p;
+}
+
+function steamAt(t) {
+  const w2 = Math.PI * 2 / STEAM_PERIOD;
+  // the steam is already alight when the card opens; it just gathers a little
+  wisps.setAttribute('opacity', (0.62 + 0.38 * outSine(span(t, 0.0, 0.9))).toFixed(4));
+  for (const w of WISPS) {
+    const N = 44, L = [], R = [];
+    for (let i = 0; i <= N; i++) {
+      const s = i / N;
+      const y = w.y - s * w.len;
+      const sway = Math.sin(s * w.k * Math.PI + w.ph - t * w2 * w.sp);
+      const x = w.x + sway * w.amp * Math.pow(s, 0.55) + w.drift * s;
+      // a little breath travelling up the column, so the ribbon reads as rising
+      const breath = 0.82 + 0.18 * Math.sin(s * 5.2 - t * w2 * w.sp * 1.6 + w.ph);
+      const width = (0.5 + w.w * Math.sin(Math.PI * Math.pow(s, 0.72))) * breath;
+      L.push([x - width / 2, y]);
+      R.push([x + width / 2, y]);
+    }
+    const f = n => n.toFixed(2);
+    let d = 'M' + L.map(q => f(q[0]) + ',' + f(q[1])).join('L');
+    d += 'L' + R.reverse().map(q => f(q[0]) + ',' + f(q[1])).join('L') + 'Z';
+    w.node.setAttribute('d', d);
+  }
+}
+
+/* ------------------------------------------------------------------ glints */
+// clockwise from the top-left corner, then one last one on the stud that sits
+// closest to the shop name itself.
+const nameBox = (() => {
+  const u = LAYERS.ustaad, s = LAYERS.samosay;
+  return { x0: Math.min(u.x, s.x), x1: Math.max(u.x + u.w, s.x + s.w),
+           y0: u.y, y1: s.y + s.h };
+})();
+const HERO = STUDS.reduce((best, s, i) => {
+  const dx = Math.max(nameBox.x0 - s.x, 0, s.x - nameBox.x1);
+  const dy = Math.max(nameBox.y0 - s.y, 0, s.y - nameBox.y1);
+  const d = Math.hypot(dx, dy);
+  return d < best.d ? { d, i } : best;
+}, { d: Infinity, i: 0 }).i;
+
+function glint(s, k) {
+  const e = Math.sin(Math.PI * k);               // in and out, no snap
+  const a = 0.26 * e * e;
+  if (a < 0.004) return;
+  const R = s.r * (1.0 + 1.35 * k);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.translate(s.x, s.y);
+  const g = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+  g.addColorStop(0.00, `rgba(255,255,250,${a * 0.85})`);
+  g.addColorStop(0.35, `rgba(255,248,232,${a * 0.24})`);
+  g.addColorStop(1.00, 'rgba(255,248,232,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(0, 0, R, 0, Math.PI * 2); ctx.fill();
+  const arms = [[0, 1.0], [Math.PI / 2, 0.78], [Math.PI / 4, 0.4], [-Math.PI / 4, 0.4]];
+  for (const [rot, strength] of arms) {
+    const len = s.r * 2.15 * (0.55 + 0.45 * e) * strength;
+    const wid = s.r * 0.17 * strength;
+    ctx.save();
+    ctx.rotate(rot);
+    ctx.fillStyle = `rgba(255,255,252,${a * strength})`;
+    ctx.beginPath();
+    ctx.moveTo(-len, 0); ctx.lineTo(0, -wid); ctx.lineTo(len, 0); ctx.lineTo(0, wid);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function glintsAt(t) {
+  const { in: a, out: b, flash } = BEATS.studs;
+  const step = (b - a - flash) / Math.max(1, STUDS.length - 1);
+  STUDS.forEach((s, i) => {
+    const k = span(t, a + i * step, a + i * step + flash);
+    if (k > 0 && k < 1) glint(s, k);
+  });
+  const lk = span(t, BEATS.lastGlint, BEATS.lastGlint + flash);
+  if (lk > 0 && lk < 1) glint(STUDS[HERO], lk);
+}
+
+/* ------------------------------------------------------------------- frame */
+function renderFrame(t) {
+  t = clamp(t, 0, DUR);
+  world.style.transform = 'scale(' + (CAM.from + (CAM.to - CAM.from) * inOutSine(t / DUR)).toFixed(6) + ')';
+
+  ctx.drawImage(plate, 0, 0);
+
+  const bu = BEATS.ustaad, bs = BEATS.samosay, br = BEATS.ribbon;
+  brushMask('ustaad', inOutSine(span(t, bu.in, bu.out)), 0.0);
+  paintLayer('ustaad', 1 + SETTLE * (1 - outSine(span(t, bu.out - bu.settle, bu.out))));
+
+  brushMask('samosay', inOutSine(span(t, bs.in, bs.out)), 2.4);
+  paintLayer('samosay', 1 + SETTLE * (1 - outSine(span(t, bs.out - bs.settle, bs.out))));
+
+  unrollMask('ribbon', outQuad(span(t, br.in, br.out)));
+  paintLayer('ribbon', 1);
+
+  glintsAt(t);
+  steamAt(t);
+}
+window.renderFrame = renderFrame;
+window.TOTAL_FRAMES = Math.round(DUR * FPS);
+
+/* --------------------------------------------------------------- bootstrap */
+function load(img, src) {
+  return new Promise(res => { img.onload = () => img.decode().then(res, res); img.src = src; });
+}
+window.READY = (async () => {
+  const jobs = [load(plate, ASSETS.plate_base)];
+  for (const name of Object.keys(LAYERS)) {
+    ink[name] = new Image();
+    jobs.push(load(ink[name], ASSETS['ink_' + name]));
+  }
+  await Promise.all(jobs);
+  await document.fonts.ready;
+  renderFrame(0);
+  return true;
+})();
+
+// Plays in a browser; the renderer ignores this and drives renderFrame directly.
+if (!location.search.includes('static')) {
+  window.READY.then(() => {
+    const t0 = performance.now();
+    (function tick(now) {
+      const t = ((now - t0) / 1000) % (DUR + 1.0);
+      renderFrame(Math.min(t, DUR));
+      requestAnimationFrame(tick);
+    })(t0);
+  });
+}
+</script>
