@@ -1,0 +1,23 @@
+{
+  "name": "endcard",
+  "version": "1.0.0",
+  "private": true,
+  "description": "5 second kinetic typography end card. Frame-accurate Remotion composition.",
+  "scripts": {
+    "dev": "remotion studio",
+    "render": "remotion render EndCard out/endcard.mp4 --codec=h264 --crf=16",
+    "render:alpha": "remotion render EndCardAlpha out/endcard_alpha.mov --codec=prores --prores-profile=4444 --pixel-format=yuva444p10le",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "^4.0.0",
+    "@remotion/google-fonts": "^4.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "remotion": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.6.0"
+  }
+}
