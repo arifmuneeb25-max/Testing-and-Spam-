@@ -45,6 +45,16 @@ in an edit.
 
 Retiming is a `theme.ts` edit. Nothing else carries a frame number.
 
+## Moving the type block
+
+The eyebrow and both lines hold a fixed rhythm and move together. Change
+`BLOCK_CENTRE_Y` in `src/theme.ts` and the whole block goes with it. It is
+currently the centre of the frame.
+
+`BLOCK_INK_CENTRE` is the offset from the eyebrow's centre line to the optical
+centre of the block, measured off a render. Touch it only if the copy or the
+point sizes change.
+
 ## Two calls worth knowing about
 
 **Ghost fade length.** The brief asks for a 14 frame fade on each of the three

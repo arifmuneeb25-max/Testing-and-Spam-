@@ -20,11 +20,29 @@ export const SHADOW = {
   gold: '0 0 1px rgba(217,164,65,0.4), 0 0 18px rgba(217,164,65,0.22)',
 } as const;
 
+/**
+ * The three lines keep a fixed rhythm and move as one block. RHYTHM is each
+ * line's centre measured down from the eyebrow's centre.
+ */
+const RHYTHM = {eyebrow: 0, line1: 74, line2: 150} as const;
+
+/**
+ * Distance from the eyebrow's centre line down to the optical centre of the
+ * whole block, measured off a render rather than guessed: the block's ink runs
+ * from the eyebrow cap height to the descender of "stop.".
+ */
+const BLOCK_INK_CENTRE = 101;
+
+/** The block is centred on the frame. Move this one number to reposition it. */
+const BLOCK_CENTRE_Y = HEIGHT / 2;
+
+const BLOCK_TOP = BLOCK_CENTRE_Y - BLOCK_INK_CENTRE;
+
 /** Vertical centre of each line, in pixels from the top of the frame. */
 export const LAYOUT = {
-  eyebrowY: 140,
-  line1Y: 214,
-  line2Y: 290,
+  eyebrowY: BLOCK_TOP + RHYTHM.eyebrow,
+  line1Y: BLOCK_TOP + RHYTHM.line1,
+  line2Y: BLOCK_TOP + RHYTHM.line2,
   eyebrowSize: 24,
   bodySize: 62,
   accentSize: 65,
@@ -52,7 +70,7 @@ export const EYEBROW = {
   start: 8,
   end: 32,
   opacity: 0.85,
-  text: 'A FILM BY MUNEEB ARIF',
+  text: 'A CONCEPT BY MUNEEB ARIF',
 } as const;
 
 /** Line 1, with the start frame of each word's reveal. */
