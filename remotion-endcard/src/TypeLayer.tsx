@@ -79,6 +79,7 @@ const Eyebrow: React.FC = () => {
           fontWeight: 400,
           fontSize: LAYOUT.eyebrowSize,
           color: COLORS.muted,
+          textShadow: SHADOW.muted,
           textTransform: 'uppercase',
           letterSpacing: `${tracking}em`,
           marginRight: `${-tracking}em`,

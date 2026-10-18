@@ -11,13 +11,25 @@ export const DURATION_IN_FRAMES = 120; // frames 0 to 119
 export const COLORS = {
   ivory: '#F2EDE4',
   gold: '#D9A441',
-  muted: '#8A94A8',
+  /**
+   * The eyebrow sits on the lit pool in the centre of the plate. The original
+   * #8A94A8 measured 1.15:1 against the bright part of that pool, a near exact
+   * value match, which is why it disappeared. Same blue grey, much higher
+   * value.
+   */
+  muted: '#DCE2EB',
   black: '#000000',
 } as const;
 
 export const SHADOW = {
   ivory: '0 0 1px rgba(242,237,228,0.35), 0 0 12px rgba(242,237,228,0.10)',
   gold: '0 0 1px rgba(217,164,65,0.4), 0 0 18px rgba(217,164,65,0.22)',
+  /**
+   * The eyebrow is 24px and widely tracked, so it has little ink to hold the
+   * eye against the confetti. A dark halo gives every stroke its own edge, so
+   * the line reads against the lit floor instead of competing with it.
+   */
+  muted: '0 1px 2px rgba(0,0,0,0.60), 0 0 16px rgba(0,0,0,0.70), 0 0 1px rgba(220,226,235,0.30)',
 } as const;
 
 /**
