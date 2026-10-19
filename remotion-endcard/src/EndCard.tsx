@@ -11,9 +11,15 @@ import {Grain} from './components/Grain';
 import {TypeLayer} from './TypeLayer';
 import {COLORS, PLATE} from './theme';
 
-/** The full card: plate, black fade up, type, grain. */
+/** The full card: plate, dim, scrim, type, black fade up, grain. */
 export const EndCard: React.FC = () => {
   const frame = useCurrentFrame();
+
+  const ease = {
+    easing: Easing.out(Easing.cubic),
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  } as const;
 
   // The plate eases to rest around the bare patch, and is dead still from
   // frame 80 on.
@@ -21,18 +27,18 @@ export const EndCard: React.FC = () => {
     frame,
     [0, PLATE.settleEnd],
     [PLATE.settleFrom, PLATE.settleTo],
-    {
-      easing: Easing.out(Easing.cubic),
-      extrapolateLeft: 'clamp',
-      extrapolateRight: 'clamp',
-    },
+    ease,
   );
 
-  const blackout = interpolate(frame, [0, PLATE.fadeOutEnd], [1, 0], {
-    easing: Easing.out(Easing.cubic),
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  });
+  // Knocked back so the words have somewhere to sit, then held there.
+  const brightness = interpolate(
+    frame,
+    [PLATE.dimStart, PLATE.dimEnd],
+    [PLATE.dimFrom, PLATE.dimTo],
+    ease,
+  );
+
+  const blackout = interpolate(frame, [0, PLATE.fadeOutEnd], [1, 0], ease);
 
   return (
     <AbsoluteFill style={{backgroundColor: COLORS.black}}>
@@ -45,21 +51,23 @@ export const EndCard: React.FC = () => {
             objectFit: 'cover',
             transform: `scale(${scale})`,
             transformOrigin: PLATE.origin,
+            filter: `brightness(${brightness})`,
           }}
         />
       </AbsoluteFill>
 
+      <AbsoluteFill style={{zIndex: 1}}>
+        <TypeLayer />
+      </AbsoluteFill>
+
+      {/* Over everything, including the type. */}
       <AbsoluteFill
         style={{
-          zIndex: 1,
+          zIndex: 2,
           backgroundColor: COLORS.black,
           opacity: blackout,
         }}
       />
-
-      <AbsoluteFill style={{zIndex: 2}}>
-        <TypeLayer />
-      </AbsoluteFill>
 
       <AbsoluteFill style={{zIndex: 3}}>
         <Grain />

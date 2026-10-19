@@ -1,6 +1,6 @@
 import React from 'react';
 import {Easing, interpolate, useCurrentFrame} from 'remotion';
-import {GHOST, GHOSTS_END} from '../theme';
+import {GHOST} from '../theme';
 
 export type GhostProps = {
   children: string;
@@ -11,14 +11,15 @@ export type GhostProps = {
   blur: number;
   fontFamily: string;
   fontSize: number;
+  fontWeight: number;
   color: string;
   letterSpacing: number;
 };
 
 /**
- * One failure stacked behind "lose". Same text, font, size, colour and x as the
- * word itself, sitting on a layer below the type so it can never read as
- * foreground.
+ * One failure stacked behind "lose". Same text, font, weight, size, colour and
+ * x as the word itself, and no shadow, so it reads as an after image of the
+ * word rather than another word.
  */
 export const Ghost: React.FC<GhostProps> = ({
   children,
@@ -28,6 +29,7 @@ export const Ghost: React.FC<GhostProps> = ({
   blur,
   fontFamily,
   fontSize,
+  fontWeight,
   color,
   letterSpacing,
 }) => {
@@ -35,10 +37,11 @@ export const Ghost: React.FC<GhostProps> = ({
 
   const riseEnd = start + GHOST.rise;
   const holdEnd = riseEnd + GHOST.hold;
+  const end = holdEnd + GHOST.fall;
 
   const opacity = interpolate(
     frame,
-    [start, riseEnd, holdEnd, GHOSTS_END],
+    [start, riseEnd, holdEnd, end],
     [0, peak, peak, 0],
     {
       easing: Easing.out(Easing.cubic),
@@ -48,7 +51,7 @@ export const Ghost: React.FC<GhostProps> = ({
   );
 
   // Drifts a further 8px down while it fades. Linear, no easing.
-  const drift = interpolate(frame, [holdEnd, GHOSTS_END], [0, GHOST.drift], {
+  const drift = interpolate(frame, [holdEnd, end], [0, GHOST.drift], {
     extrapolateLeft: 'clamp',
     extrapolateRight: 'clamp',
   });
@@ -62,7 +65,7 @@ export const Ghost: React.FC<GhostProps> = ({
         whiteSpace: 'nowrap',
         visibility: 'visible',
         fontFamily,
-        fontWeight: 400,
+        fontWeight,
         fontSize,
         color,
         letterSpacing: `${letterSpacing}em`,

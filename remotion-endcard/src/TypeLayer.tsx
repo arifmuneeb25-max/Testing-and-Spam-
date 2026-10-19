@@ -1,23 +1,24 @@
 import React from 'react';
-import {AbsoluteFill, Easing, interpolate, useCurrentFrame} from 'remotion';
-import {ALMARAI, INSTRUMENT_SERIF} from './fonts';
+import {AbsoluteFill} from 'remotion';
+import {ACCENT_WEIGHT, ALMARAI, BODY_WEIGHT, INSTRUMENT_SERIF} from './fonts';
 import {Ghost} from './components/Ghost';
+import {Scrim} from './components/Scrim';
 import {Word, wordLayoutStyle} from './components/Word';
 import {
   COLORS,
-  EYEBROW,
   GHOST_ANCHOR_INDEX,
   GHOSTS,
   LAYOUT,
   LINE_1,
   LINE_2,
+  LINE_3,
   SHADOW,
   STOP,
 } from './theme';
 
 /**
- * A line of type whose vertical centre sits on y. Both lines are laid out at
- * their final resting positions, then each word animates in from an offset, so
+ * A line of type whose vertical centre sits on y. Every line is laid out at
+ * its final resting position, then each word animates in from an offset, so
  * nothing ever pushes or reflows a neighbour.
  */
 const Line: React.FC<{
@@ -40,6 +41,7 @@ const Line: React.FC<{
       // carries the body metrics. Without it they fall back to the root size
       // and the words sit almost on top of each other.
       fontFamily: ALMARAI,
+      fontWeight: BODY_WEIGHT,
       fontSize: LAYOUT.bodySize,
       letterSpacing: 0,
     }}
@@ -48,53 +50,24 @@ const Line: React.FC<{
   </div>
 );
 
-const Eyebrow: React.FC = () => {
-  const frame = useCurrentFrame();
-  const options = {
-    easing: Easing.out(Easing.cubic),
-    extrapolateLeft: 'clamp',
-    extrapolateRight: 'clamp',
-  } as const;
-
-  const opacity = interpolate(
-    frame,
-    [EYEBROW.start, EYEBROW.end],
-    [0, EYEBROW.opacity],
-    options,
-  );
-  const tracking = interpolate(
-    frame,
-    [EYEBROW.start, EYEBROW.end],
-    [LAYOUT.eyebrowTrackingStart, LAYOUT.eyebrowTracking],
-    options,
-  );
-
-  // No movement, no blur. Only the opacity and the tracking.
-  return (
-    <Line y={LAYOUT.eyebrowY} zIndex={3}>
-      <span
-        style={{
-          display: 'inline-block',
-          fontFamily: ALMARAI,
-          fontWeight: 400,
-          fontSize: LAYOUT.eyebrowSize,
-          color: COLORS.muted,
-          textShadow: SHADOW.muted,
-          textTransform: 'uppercase',
-          letterSpacing: `${tracking}em`,
-          marginRight: `${-tracking}em`,
-          opacity,
-        }}
-      >
-        {EYEBROW.text}
-      </span>
-    </Line>
-  );
-};
+/** An ivory Almarai word on the standard reveal. Lines 1 to 3 are all this. */
+const BodyWord: React.FC<{text: string; start: number}> = ({text, start}) => (
+  <Word
+    start={start}
+    fontFamily={ALMARAI}
+    fontSize={LAYOUT.bodySize}
+    fontWeight={BODY_WEIGHT}
+    color={COLORS.ivory}
+    textShadow={SHADOW.ivory}
+    letterSpacing={LAYOUT.bodyTracking}
+  >
+    {text}
+  </Word>
+);
 
 /**
  * A copy of line 1 with every word invisible but still measured, carrying the
- * ghost stack under "lose". Lives below the type layer.
+ * ghost stack under "lose". Sits below the type and above the scrim.
  */
 const GhostLayer: React.FC = () => (
   <Line y={LAYOUT.line1Y} zIndex={1}>
@@ -103,7 +76,12 @@ const GhostLayer: React.FC = () => (
         {i > 0 ? ' ' : null}
         <span
           style={{
-            ...wordLayoutStyle(ALMARAI, LAYOUT.bodySize, LAYOUT.bodyTracking),
+            ...wordLayoutStyle(
+              ALMARAI,
+              LAYOUT.bodySize,
+              BODY_WEIGHT,
+              LAYOUT.bodyTracking,
+            ),
             position: i === GHOST_ANCHOR_INDEX ? 'relative' : 'static',
             visibility: 'hidden',
           }}
@@ -119,6 +97,7 @@ const GhostLayer: React.FC = () => (
                   blur={ghost.blur}
                   fontFamily={ALMARAI}
                   fontSize={LAYOUT.bodySize}
+                  fontWeight={BODY_WEIGHT}
                   color={COLORS.ivory}
                   letterSpacing={LAYOUT.bodyTracking}
                 >
@@ -132,51 +111,43 @@ const GhostLayer: React.FC = () => (
   </Line>
 );
 
-/** Eyebrow, both headlines and the ghosts. No plate, no fade, no grain. */
+/** Scrim, ghosts and all three lines. No plate, no dim, no fade, no grain. */
 export const TypeLayer: React.FC = () => (
   <AbsoluteFill
     style={{
       WebkitFontSmoothing: 'antialiased',
       textRendering: 'optimizeLegibility',
-      // Subpixel positioning: lets the words land on fractional pixels instead
-      // of snapping, which is what keeps the reveal from stepping.
       fontKerning: 'normal',
     }}
   >
-    <Eyebrow />
+    <AbsoluteFill style={{zIndex: 0}}>
+      <Scrim />
+    </AbsoluteFill>
+
     <GhostLayer />
 
     <Line y={LAYOUT.line1Y} zIndex={2}>
       {LINE_1.map((word, i) => (
         <React.Fragment key={word.text}>
           {i > 0 ? ' ' : null}
-          <Word
-            start={word.start}
-            fontFamily={ALMARAI}
-            fontSize={LAYOUT.bodySize}
-            color={COLORS.ivory}
-            textShadow={SHADOW.ivory}
-            letterSpacing={LAYOUT.bodyTracking}
-          >
-            {word.text}
-          </Word>
+          <BodyWord text={word.text} start={word.start} />
         </React.Fragment>
       ))}
     </Line>
 
     <Line y={LAYOUT.line2Y} zIndex={2}>
-      {LINE_2.map((word) => (
+      {LINE_2.map((word, i) => (
         <React.Fragment key={word.text}>
-          <Word
-            start={word.start}
-            fontFamily={ALMARAI}
-            fontSize={LAYOUT.bodySize}
-            color={COLORS.ivory}
-            textShadow={SHADOW.ivory}
-            letterSpacing={LAYOUT.bodyTracking}
-          >
-            {word.text}
-          </Word>{' '}
+          {i > 0 ? ' ' : null}
+          <BodyWord text={word.text} start={word.start} />
+        </React.Fragment>
+      ))}
+    </Line>
+
+    <Line y={LAYOUT.line3Y} zIndex={2}>
+      {LINE_3.map((word) => (
+        <React.Fragment key={word.text}>
+          <BodyWord text={word.text} start={word.start} />{' '}
         </React.Fragment>
       ))}
       <Word
@@ -187,9 +158,10 @@ export const TypeLayer: React.FC = () => (
         fontFamily={INSTRUMENT_SERIF}
         fontStyle="italic"
         fontSize={LAYOUT.accentSize}
+        fontWeight={ACCENT_WEIGHT}
         color={COLORS.gold}
         textShadow={SHADOW.gold}
-        letterSpacing={0}
+        letterSpacing={LAYOUT.accentTracking}
         drift={{
           from: STOP.driftFrom,
           to: STOP.driftTo,
